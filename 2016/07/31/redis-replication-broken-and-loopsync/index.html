@@ -1,0 +1,833 @@
+<!doctype html>
+
+
+
+  
+
+
+<html class="theme-next mist use-motion">
+<head>
+  <meta charset="UTF-8"/>
+<meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1"/>
+
+
+
+<meta http-equiv="Cache-Control" content="no-transform" />
+<meta http-equiv="Cache-Control" content="no-siteapp" />
+
+
+
+
+
+
+
+
+
+
+
+
+  
+  
+  <link href="/vendors/fancybox/source/jquery.fancybox.css?v=2.1.5" rel="stylesheet" type="text/css" />
+
+
+
+
+  
+  
+  
+  
+
+  
+    
+    
+  
+
+  
+
+  
+
+  
+
+  
+
+  
+    
+    
+    <link href="//fonts.googleapis.com/css?family=Lato:300,300italic,400,400italic,700,700italic&subset=latin,latin-ext" rel="stylesheet" type="text/css">
+  
+
+
+
+
+
+
+<link href="/vendors/font-awesome/css/font-awesome.min.css?v=4.4.0" rel="stylesheet" type="text/css" />
+
+<link href="/css/main.css?v=5.0.1" rel="stylesheet" type="text/css" />
+
+
+  <meta name="keywords" content="Redis," />
+
+
+
+
+
+  <link rel="alternate" href="/atom.xml" title="今天" type="application/atom+xml" />
+
+
+
+
+  <link rel="shortcut icon" type="image/x-icon" href="/favicon.ico?v=5.0.1" />
+
+
+
+
+
+
+<meta name="description" content="很多常见数据库(含NoSQL)都用复制技术的多机结构，以实现数据冗余、高可用、数据备份和多地域读取等；如MySQL/MongoDB/Redis, 所以复制中断异常的Troubleshtooing和预案都是DBA们常常聊话题。本文主要写Redis较常见的两种复制中断，以及导致反复无限次同步。
+
+Redis复制中断的影响Redis复制中断后，Slave会立即发起psync,psync尝试部署同步不成功">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Redis复制中断和无限同步问题">
+<meta property="og:url" content="http://yoursite.com/2016/07/31/redis-replication-broken-and-loopsync/index.html">
+<meta property="og:site_name" content="今天">
+<meta property="og:description" content="很多常见数据库(含NoSQL)都用复制技术的多机结构，以实现数据冗余、高可用、数据备份和多地域读取等；如MySQL/MongoDB/Redis, 所以复制中断异常的Troubleshtooing和预案都是DBA们常常聊话题。本文主要写Redis较常见的两种复制中断，以及导致反复无限次同步。
+
+Redis复制中断的影响Redis复制中断后，Slave会立即发起psync,psync尝试部署同步不成功">
+<meta property="og:updated_time" content="2016-08-09T12:40:50.000Z">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="Redis复制中断和无限同步问题">
+<meta name="twitter:description" content="很多常见数据库(含NoSQL)都用复制技术的多机结构，以实现数据冗余、高可用、数据备份和多地域读取等；如MySQL/MongoDB/Redis, 所以复制中断异常的Troubleshtooing和预案都是DBA们常常聊话题。本文主要写Redis较常见的两种复制中断，以及导致反复无限次同步。
+
+Redis复制中断的影响Redis复制中断后，Slave会立即发起psync,psync尝试部署同步不成功">
+
+
+
+<script type="text/javascript" id="hexo.configuration">
+  var NexT = window.NexT || {};
+  var CONFIG = {
+    scheme: 'Mist',
+    sidebar: {"position":"left","display":"post"},
+    fancybox: true,
+    motion: true,
+    duoshuo: {
+      userId: 6316444262204442000,
+      author: '今天'
+    }
+  };
+</script>
+
+
+
+
+  <link rel="canonical" href="http://yoursite.com/2016/07/31/redis-replication-broken-and-loopsync/"/>
+
+  <title> Redis复制中断和无限同步问题 | 今天 </title>
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage" lang="zh-Hans">
+
+  
+
+
+
+
+
+
+
+
+
+
+  
+  
+    
+  
+
+  <div class="container one-collumn sidebar-position-left page-post-detail ">
+    <div class="headband"></div>
+
+    <header id="header" class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-meta ">
+  
+
+  <div class="custom-logo-site-title">
+    <a href="/"  class="brand" rel="start">
+      <span class="logo-line-before"><i></i></span>
+      <span class="site-title">今天</span>
+      <span class="logo-line-after"><i></i></span>
+    </a>
+  </div>
+  <p class="site-subtitle"></p>
+</div>
+
+<div class="site-nav-toggle">
+  <button>
+    <span class="btn-bar"></span>
+    <span class="btn-bar"></span>
+    <span class="btn-bar"></span>
+  </button>
+</div>
+
+<nav class="site-nav">
+  
+
+  
+    <ul id="menu" class="menu">
+      
+        
+        <li class="menu-item menu-item-home">
+          <a href="/" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-home"></i> <br />
+            
+            首页
+          </a>
+        </li>
+      
+        
+        <li class="menu-item menu-item-categories">
+          <a href="/categories" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-th"></i> <br />
+            
+            分类
+          </a>
+        </li>
+      
+        
+        <li class="menu-item menu-item-archives">
+          <a href="/archives" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-archive"></i> <br />
+            
+            归档
+          </a>
+        </li>
+      
+        
+        <li class="menu-item menu-item-books">
+          <a href="/books" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-heartbeat"></i> <br />
+            
+            书单
+          </a>
+        </li>
+      
+
+      
+    </ul>
+  
+
+  
+</nav>
+
+ </div>
+    </header>
+
+    <main id="main" class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          <div id="content" class="content">
+            
+
+  <div id="posts" class="posts-expand">
+    
+
+  
+  
+
+  
+  
+  
+
+  <article class="post post-type-normal " itemscope itemtype="http://schema.org/Article">
+
+    
+      <header class="post-header">
+
+        
+        
+          <h1 class="post-title" itemprop="name headline">
+            
+            
+              
+                Redis复制中断和无限同步问题
+              
+            
+          </h1>
+        
+
+        <div class="post-meta">
+          <span class="post-time">
+            <span class="post-meta-item-icon">
+              <i class="fa fa-calendar-o"></i>
+            </span>
+            <span class="post-meta-item-text">发表于</span>
+            <time itemprop="dateCreated" datetime="2016-07-31T18:33:33+08:00" content="2016-07-31">
+              2016-07-31
+            </time>
+          </span>
+
+          
+            <span class="post-category" >
+              &nbsp; | &nbsp;
+              <span class="post-meta-item-icon">
+                <i class="fa fa-folder-o"></i>
+              </span>
+              <span class="post-meta-item-text">分类于</span>
+              
+                <span itemprop="about" itemscope itemtype="https://schema.org/Thing">
+                  <a href="/categories/Redis/" itemprop="url" rel="index">
+                    <span itemprop="name">Redis</span>
+                  </a>
+                </span>
+
+                
+                
+
+              
+            </span>
+          
+
+          
+            
+              <span class="post-comments-count">
+                &nbsp; | &nbsp;
+                <a href="/2016/07/31/redis-replication-broken-and-loopsync/#comments" itemprop="discussionUrl">
+                  <span class="post-comments-count ds-thread-count" data-thread-key="2016/07/31/redis-replication-broken-and-loopsync/" itemprop="commentsCount"></span>
+                </a>
+              </span>
+            
+          
+
+          
+
+          
+          
+
+          
+              &nbsp; | &nbsp;
+              <span class="page-pv"><i class="fa fa-file-o"></i>
+              <span class="busuanzi-value" id="busuanzi_value_page_pv" ></span>
+              </span>
+          
+        </div>
+      </header>
+    
+
+
+    <div class="post-body" itemprop="articleBody">
+
+      
+      
+
+      
+        <p>很多常见数据库(含NoSQL)都用复制技术的多机结构，以实现数据冗余、高可用、数据备份和多地域读取等；<br>如MySQL/MongoDB/Redis, 所以复制中断异常的Troubleshtooing和预案都是DBA们常常聊话题。<br>本文主要写Redis较常见的两种复制中断，以及导致反复无限次同步。</p>
+<hr>
+<h2 id="Redis复制中断的影响"><a href="#Redis复制中断的影响" class="headerlink" title="Redis复制中断的影响"></a>Redis复制中断的影响</h2><p>Redis复制中断后，Slave会立即发起psync,psync尝试部署同步不成功，就会全量同步RDB；这样对分布式Redis集群影响较大。</p>
+<ul>
+<li>复制中断，Redis集群当前分片存在单点故障风险，此间Master故障，无可用slave进行failover，当前分片将不可用。</li>
+<li>如果Redis全量同步，会导致Master执行bgsave,进程fork, 可造成master达到毫秒或秒级的卡顿。</li>
+<li>Redis进程Fork导致Copy-On-Write(下文简称COW)，最大能导致Master进程内存使用量的消耗。(eg RDB: 5213 MB of memory used by copy-on-write)</li>
+<li>Redis Slave load RDB过程，会导致复制线程的client output buffer增长很大；增大Master进程内存消耗</li>
+<li>Redis保存RDB(不考虑disless replication),导致服务器磁盘IO和CPU(压缩)资源消耗</li>
+<li>发送数GB大小的RDB文件,会导致服务器网络出口爆增，磁盘顺序IO吞吐量高，如果千兆网卡服务器，期间会影响业务正常请求响应时间(以及其他连锁影响)</li>
+</ul>
+<h2 id="Redis复制中断场景"><a href="#Redis复制中断场景" class="headerlink" title="Redis复制中断场景"></a>Redis复制中断场景</h2><p>导致Redis复制中断场景，常见以下两种情况(注:不包含网络等外部环境)</p>
+<ul>
+<li>Master端的Slave客户端输出缓冲，达到限制大小，被客户端强制Kill，导致复制中断</li>
+<li>Master和Slave之间复制超时repl-timeout断开，导致复制中断</li>
+</ul>
+<h3 id="Slave客户端的Client-output-buffer达到大小限制被Master强制Kill"><a href="#Slave客户端的Client-output-buffer达到大小限制被Master强制Kill" class="headerlink" title="Slave客户端的Client output buffer达到大小限制被Master强制Kill"></a>Slave客户端的Client output buffer达到大小限制被Master强制Kill</h3><p>为实时同步Master写入数据，Slave产生一个长连接到Master；当这个长连接被断开后，复制被中断。2.1小节深入讨论因输出缓冲区达到大小限制，复制连接被Master强行断开的理论分析、故障现象和规避措施.</p>
+<h4 id="输出缓冲区"><a href="#输出缓冲区" class="headerlink" title="输出缓冲区"></a>输出缓冲区</h4><p> Redis每个客户端都两个输出输出缓冲区(client output buffer),运行命令的返回结果，会放入到缓冲区中。</p>
+<ul>
+<li>静态定长16KB的缓存区；主要快速存储返回比较小的结果；如简单的get等</li>
+<li>动态大小缓冲区；存储返回较大的结果，如大的集合类型:set/list/hash<br>————– 关于客户端的输出缓存区，可见《Redis Client query buffer and client output buffer》</li>
+</ul>
+<h4 id="client-output-buffer-limit"><a href="#client-output-buffer-limit" class="headerlink" title="client-output-buffer-limit"></a>client-output-buffer-limit</h4><p>  Redis为避免输出缓冲区过度耗用内存，使用client-output-buffer-limit参数限制客户端输出缓冲区内存使用量。<br>  关于Redis如何限制输出缓冲区限制，请参考官方<a href="http://redis.io/topics/clients" target="_blank" rel="external">文章</a>。<br>  Redis数据复制过程中，Slave有个flags=S的客户端连接到Master; 它和其他客户端一样有输出缓冲区和缓冲区大小限制。<br>  <figure class="highlight plain"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div></pre></td><td class="code"><pre><div class="line"># 输出缓冲配置格式：client-output-buffer-limit &lt;class&gt; &lt;hard limit&gt; &lt;soft limit&gt; &lt;soft seconds&gt;</div><div class="line">下面是Master上的slave客户端，默认缓冲区大小限制:当缓冲区使用超过256mb,Master会尽快杀掉它；</div><div class="line">当缓冲区使用大于64mb,且小于256mb的soft limit值时，并持续时间达60秒，也会被Master尽快杀掉。</div><div class="line">client-output-buffer-limit slave 256mb 64mb 60</div></pre></td></tr></table></figure></p>
+<p>关于如何查看，各个客户端的输出缓冲区使用情况，请见blog—有详细说明。</p>
+<h4 id="Master因slave-client输出缓冲区中断复制的现象"><a href="#Master因slave-client输出缓冲区中断复制的现象" class="headerlink" title="Master因slave client输出缓冲区中断复制的现象"></a>Master因slave client输出缓冲区中断复制的现象</h4><p>出现因slave client输出缓冲区达到限制，被Master强行断开。Master的日志中会显示以下内容。<br>可见Slave同步线程id=220(flags=S),输出缓冲区大小已使用256mb(omem=268436720),提示被Master断开；<br>另外Slave发现复制断开后，会马上发送psync进行同步，这时容易因buffer再失败，这样无限循环复制的情况就产生。<br><figure class="highlight plain"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div></pre></td><td class="code"><pre><div class="line"># Client id=220 addr=127.0.0.1:23972 age=1213 idle=0 flags=S db=0 qbuf=0 qbuf-free=0 obl=0 oll=9350 omem=268436720 events=rw cmd=replconf scheduled to be closed ASAP for overcoming of output buffer limits.</div><div class="line">[30042] 31 Jul 13:36:01.291 # Connection with slave 127.0.0.1:7001 lost.</div><div class="line">[30042] 31 Jul 13:36:01.548 * Slave asks for synchronization</div></pre></td></tr></table></figure></p>
+<h4 id="导致输出缓冲区达到限制的场景"><a href="#导致输出缓冲区达到限制的场景" class="headerlink" title="导致输出缓冲区达到限制的场景"></a>导致输出缓冲区达到限制的场景</h4><p>导致slave客户端输出缓冲达到限制的常见场景：</p>
+<ul>
+<li>Master写入的数据量过大(写入QPS*每个命令操作的key大小)，导致在Master端堆积，消耗同步线程的输出缓冲区。</li>
+<li>Slave重新全量同步，初始化过程中，Master写入命令是堆积在同步线程的输出缓冲区。</li>
+</ul>
+<p>第一种情况出现的情况较少，我们生产出现两次都是程序问题。通过测试，如果写入命令的流量在80MB+就比较危险，这时就会看到slave同步线程的输出缓冲区omem开始有增长。</p>
+<p>第二种情况出现机率较大，因Redis Slave向Master发起全量同步数据，这个过程拆分几个步骤，此期间Master的写入命令都存储在同步线程的输出缓冲区。<br>全量同步过程耗时简化为串行的4步：</p>
+<ul>
+<li>Master执行bgsave, fork子进程保存和压缩RDB文件；耗时T1.</li>
+<li>Master把RDB文件发送给Slave过程；耗时T2.</li>
+<li>Slave flush自己的数据；耗时T3.</li>
+<li>Slave Load RDB ;  耗时T4.</li>
+</ul>
+<p>全量同步过程总耗时T=(T1+T2+T3+T4)之和，这4步耗时量增大，那么Master端写入命令堆积到缓冲区的数据量就增大，一旦达到限制的条件，Master就断开同步线程。下面Master日志就显示全量同步过程中的断开情况，注意：cmd=psync和前文2.1.3节中的cmd=replconf是不同的。 psync表示中全量同步时期间导致中断(第二种情况)，replconf表示正常过程中被中断（第一种情况). 下节讨论如何处理这种情况。<br><figure class="highlight plain"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div></pre></td><td class="code"><pre><div class="line"># Client id=809 addr=127.0.0.1:44100  age=2 idle=2 flags=S  qbuf=0 qbuf-free=0 obl=14717 oll=13082 omem=268442640 events=r cmd=psync scheduled to be closed ASAP for overcoming of output buffer limits.</div><div class="line">[25666] 01 Aug 20:31:39.226 # Connection with slave 127.0.0.1:7001 lost.</div></pre></td></tr></table></figure></p>
+<h4 id="因输出缓冲区导致复制中断故障处理"><a href="#因输出缓冲区导致复制中断故障处理" class="headerlink" title="因输出缓冲区导致复制中断故障处理"></a>因输出缓冲区导致复制中断故障处理</h4><p>DBA收到复制中断告警，</p>
+<ul>
+<li><p>第一步：通过查看Master的日志，追查这次复制中断故障的第一条日志，如果见到前文2.1.3节点的错误日志，基本能确认Master写入数据量过大导致。<br>一般通过其他监控告警项再确认，Redis的写入数据指标：total_net_input_bytes，服务器的网络入口流量。</p>
+</li>
+<li><p>第二步：如果确认原因，建议马上中止slave的反复同步(这里会出现2.1.4中第二种情况)，一般通过暂时关闭从库方式。</p>
+</li>
+<li><p>第三步：快速定位是哪类KEY写入流量最大；使用工具<a href="https://github.com/hirose31/redis-traffic-stats" target="_blank" rel="external">redis-traffic-stats</a>分析top traffic的key和commands. 通过分析定位是set ad:1000:xxxx这个大key(7.3MB)导致的；然后通知负责这个key前缀的业务工程师，<br>通知停止服务或回滚上线等。这里也可用<a href="https://github.com/facebookarchive/redis-faina" target="_blank" rel="external">facebook redis-faina</a>，它时基于monitor命令；部署简单，但定位traffic问题没这么直观。</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div></pre></td><td class="code"><pre><div class="line">## Command Detail</div><div class="line">### SET</div><div class="line">Key                                                        | Bytes     | Byte/sec     | Count  | Pct    | Req/sec</div><div class="line">-----------------------------------------------------------|----------:|-------------:|-------:|-------:|---------:</div><div class="line">ad:1000:xxxx                                     | 156416272 |  52138757.33 |     23 |   0.20 |     7.67</div><div class="line">ad:10001:xxxx                  |    114804 |     38268.00 |    149 |   1.31 |    49.67</div></pre></td></tr></table></figure>
+</li>
+<li><p>第四步：业务fix问题后；准备恢复主从同步复制；这时就有第二种情况，因同步4个时间段; 这时DBA需临时对调大<br>client-output-buffer-limit的slave limit到数GB; 同时mv掉从库RDB/AOF文件让Slave以空实例启动(避免T3时间消耗)；监控Master的同步线程(flags=S)的omem值的增长情况，通过微调直到复制正常同步。</p>
+</li>
+<li>第五步：故障完全解决；然后组织postmortem会议分析故障和action plan.</li>
+</ul>
+<p>从这个故障案例中，DBA进一步工作：</p>
+<ul>
+<li>[monitor]如果监测缓冲区、Redis进程网络IO等，故障前发现异常行为</li>
+<li>[proxy]redis的自我保护或过载保护机制弱；我们需要一个proxy来完成类似功能，如过1mb的key就丢弃</li>
+<li>[platform]我们需要一个平台，准实时采样监测Redis实例级的top commands, top hot key, top traffic等</li>
+</ul>
+<h3 id="Master-Slave因复制超时，导致复制中断"><a href="#Master-Slave因复制超时，导致复制中断" class="headerlink" title="Master-Slave因复制超时，导致复制中断"></a>Master-Slave因复制超时，导致复制中断</h3><p>Redis复制中，Master和Slave彼此间都有心跳检测，如果检测超过repl-timeout秒(默认60)，就会认为超时，并强行断开复制， Slave感知断开后，会重新发起psync。</p>
+<h4 id="Master与Slave间的心跳检测"><a href="#Master与Slave间的心跳检测" class="headerlink" title="Master与Slave间的心跳检测"></a>Master与Slave间的心跳检测</h4><p>那么Redis Master和slave是怎么做心跳检查的</p>
+<ul>
+<li>Master每隔10秒(repl-ping-slave-period参数配置)向Slave发送PING命令</li>
+<li>Slave每隔1秒向Master发送”REPLCONF” “ACK” “数字(slave_repl_offset)”</li>
+</ul>
+<p>Master发送给Slave的PING命令，在Slave端使用Monitor命令查看如下：<br><figure class="highlight plain"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div></pre></td><td class="code"><pre><div class="line">1470062065.418475 [0 127.0.0.1:7000] &quot;PING&quot;</div><div class="line">1470062075.431501 [0 127.0.0.1:7000] &quot;PING&quot;</div></pre></td></tr></table></figure></p>
+<p>Slave发送Master的REPLCONF命令,在Master端使用Monitor命令查看<br><figure class="highlight plain"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div></pre></td><td class="code"><pre><div class="line">1470062074.229797 [0 127.0.0.1:44105] &quot;REPLCONF&quot; &quot;ACK&quot; &quot;137158669602&quot;</div><div class="line">1470062075.231199 [0 127.0.0.1:44105] &quot;REPLCONF&quot; &quot;ACK&quot; &quot;137158669602&quot;</div><div class="line">1470062076.232647 [0 127.0.0.1:44105] &quot;REPLCONF&quot; &quot;ACK&quot; &quot;137158669616&quot;</div></pre></td></tr></table></figure></p>
+<h4 id="Redis判断复制超时的3个角度"><a href="#Redis判断复制超时的3个角度" class="headerlink" title="Redis判断复制超时的3个角度"></a>Redis判断复制超时的3个角度</h4><p>Redis从3个角度判断复制超时，任何一个出现都将导致复制超时中断。</p>
+<ul>
+<li>第一种 从Master端角度看: 在repl-timeout秒内未收到Slave的REPLCONF ACK pings指令，Maste认为超时并强制断开复制(可通过Master中info Replication中lag=x，x表示Slave最近一次上报间隔秒数)</li>
+<li>第二种 从Slave端角度看: repl-timeout秒内未收到Master的数据或PING命令，Slave认为超时并强制断开复制，并立即发送重新同步，反复尝试，直接到同步成功。(可通过Slave中info Replication的 master_last_io_seconds_ago指标，表示主库最近发送数据的间隔秒数)</li>
+<li>第三种 从Slave端角度看：复制同步时，Slave发送psync等待Master发送RDB文件，如果repl-timeout秒内未收到RDB文件，Slave认为Master持久化异常，断开复制。</li>
+</ul>
+<p>第一种超时， Master的日志中出现内容<br><figure class="highlight plain"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div></pre></td><td class="code"><pre><div class="line">[29129] 29 Jul 03:16:05.910 # Disconnecting timedout slave: 127.0.0.1:7001</div><div class="line">[29129] 29 Jul 03:16:05.910 # Connection with slave 127.0.0.1:7001 lost.</div><div class="line">[29129] 29 Jul 03:16:06.148 * Slave asks for synchronization</div></pre></td></tr></table></figure></p>
+<p>另外如果有监控lag指标，lag正常是1和0之间波动；如果lag出现在较大，可发送告警，说明Slave未及时发送replconf指令<br><figure class="highlight plain"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div></pre></td><td class="code"><pre><div class="line">$info replication</div><div class="line"># Replication</div><div class="line">role:master</div><div class="line">connected_slaves:1</div><div class="line">slave0:ip=127.0.0.1,port=7001,state=online,offset=3535,lag=50</div><div class="line">master_repl_offset:35374</div></pre></td></tr></table></figure></p>
+<p>第二种超时，Slave日志中出现内容<br><figure class="highlight plain"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div></pre></td><td class="code"><pre><div class="line">[30100] 29 Jul 03:34:24.625 # MASTER timeout: no data nor PING received...</div><div class="line">[30100] 29 Jul 03:34:24.625 # Connection with master lost.</div><div class="line">[30100] 29 Jul 03:34:24.625 * Caching the disconnected master state.</div><div class="line">[30100] 29 Jul 03:34:24.625 * Connecting to MASTER 127.0.0.1:7000</div><div class="line">[30100] 29 Jul 03:34:24.625 * MASTER &lt;-&gt; SLAVE sync started</div></pre></td></tr></table></figure></p>
+<p>另外如果有监控master_last_io_seconds_ago指标，表示离上次Master发送数据或PING命令到Slave时间<br>一般大于10秒就建议告警。</p>
+<p>第三种超时，比较难复现，查看源码可见，Slave日志以下内容<br><figure class="highlight plain"><table><tr><td class="gutter"><pre><div class="line">1</div></pre></td><td class="code"><pre><div class="line">Timeout receiving bulk data from MASTER... If the problem persists try to set the &apos;repl-timeout&apos; parameter in redis.conf to a larger value.&quot;</div></pre></td></tr></table></figure></p>
+<h4 id="导致复制超时的场景"><a href="#导致复制超时的场景" class="headerlink" title="导致复制超时的场景"></a>导致复制超时的场景</h4><p>从前面2节中，我们已分析Redis心跳检测机制和复制超时判断的3个角度；现在很容易指明导致复制超时的场景</p>
+<ul>
+<li>Master执行大命令，运行阻塞超过repl-timeout秒，未向Slave发送任何写数据和PING; 导致Slave中断复制。</li>
+<li>Slave执行大命令，运行阻塞超过repl-timeout秒,未向Master上报”REPLCONF” “ACK”；导致Master中断复制。</li>
+<li>Master bgsave生成RDB失败或过慢；从2.8/3.x版本这个过程只包含前文2.1.3中的T1耗时的一部分；所以在新版本中这类超时很难出现了。</li>
+</ul>
+<h4 id="复制超时的故障处理"><a href="#复制超时的故障处理" class="headerlink" title="复制超时的故障处理"></a>复制超时的故障处理</h4><p>复制超时中断一般会接收以下告警：<br><figure class="highlight plain"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div></pre></td><td class="code"><pre><div class="line">1 slave告警：master_link_status=0 复制中断</div><div class="line">2 master告警：slave-lag&gt;30 slave 30秒内未上报数据</div><div class="line">3 slave告警：master_last_io_seconds_ago&gt;30 master 30秒内未向slave发送数据或ping命令</div><div class="line">4 master/slave告警： slowlog_len 慢查询告警</div></pre></td></tr></table></figure></p>
+<p>处理流程</p>
+<ul>
+<li>第一步 确认导致超时的节点是Master或Slave?  通过2,3告警，以及登录两个实例slowlog get查看慢查询确认</li>
+<li>第二步 解决问题前，先停掉复制同步，避免无限重复同步，进一步影响业务性能</li>
+<li>第三步 第一步定位的有问题节点，通过slowlog get 分析查询耗时大于30~60秒的大操作，包含key等<br>并通过RD停掉相关操作</li>
+<li>第四步 确认问题节点，无这类慢查询后；恢复复制同步</li>
+<li>组织postmortem会议；分析如何避免这类问题？（见后文第4节）</li>
+</ul>
+<p>正常的Redis请求P99响应时间都是小于1ms的；但RD有时会手动执行O(n)的命令，比如keys hgetall类<br>如keys命令，生产都会rename掉。</p>
+<h2 id="无限次循环复制"><a href="#无限次循环复制" class="headerlink" title="无限次循环复制"></a>无限次循环复制</h2><p>Redis复制被中断后，Slave会不停地重新同步psync,直到同步成功。<br>过程：slave发送psync –&gt; master bgsave(2.1.4中的4个步骤) –&gt;复制因缓冲区限制中断（2.8版本后，重新同步基本不会出现超时断开）–&gt; slave立即又psync<br>因为每次同步的对Master的性能和资源影响都较大，所以生产出现反复同步后，需DBA立即介入处理。<br>在修复同步前，要先解决导致同步第一次中断的原因，最好解决后；再用以下方法恢复同步<br>处理流程：</p>
+<ul>
+<li>第1步 解决问题前，先停掉复制同步(slaveof no one， cluster需关闭slave)，避免无限重复同步，进一步影响业务性能</li>
+<li>第2步 分析Master日志，确认反复同步失败的原因:是输出缓冲区，还是repl-timeout</li>
+<li>第3步 如果超时导致先临时调大repl-timeout(如600秒)；如复制线程输出缓冲区导致：调大client-output-buffer-limit slave 的hardlimit， softlimit sec；<br>同步调大maxmemory避免缓冲区内存消耗内存后，引起缓存数据大量淘汰，引起缓存穿透。</li>
+<li>第4步 减少同步的耗时阶段-slave flush old data(flushall每秒处理数十万key): 关闭Slave，移走它的RDB和AOF文件，启动Slave空实例</li>
+<li>第5步 Master端查看复制线程输出缓冲区消耗情况，如果失败还需临时调大。 恢复后建议回调参数设置</li>
+</ul>
+<h2 id="怎么规避和提前发现复制同步异常"><a href="#怎么规避和提前发现复制同步异常" class="headerlink" title="怎么规避和提前发现复制同步异常"></a>怎么规避和提前发现复制同步异常</h2><p>已比较详细分析出现复制中断的原理和场景， 在生产大规模集群运营中，定制合理的规范和流程；</p>
+<ul>
+<li>设置合理的Redis配置参数</li>
+<li>靠谱的监控预警，提前发现隐患</li>
+<li>开发规范和写入容量规划</li>
+<li>过载保护的proxy或SDK</li>
+</ul>
+<h3 id="针对复制中断问题，设置合理的配置参数"><a href="#针对复制中断问题，设置合理的配置参数" class="headerlink" title="针对复制中断问题，设置合理的配置参数"></a>针对复制中断问题，设置合理的配置参数</h3><p>请根据各自的场景进行微调，这里只是把问题提出来，给定个参考值<br><figure class="highlight plain"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div></pre></td><td class="code"><pre><div class="line">1 调大slave的输出缓冲区大小设置，尤其是&lt;soft limit&gt; &lt;soft seconds&gt;。 注意此设置每个Slave对应一个Slave输出缓冲区。</div><div class="line">  client-output-buffer-limit slave 1gb 256mb 600</div><div class="line">2 maxmemory需考虑输出缓冲区的消耗，尤其未设置淘汰，可能导致used_memory达到maxmemory写入失败</div><div class="line">3 数据非强一致场景,建议调大repl-timeout到70秒；因为监控数据采集周期为60秒，提高发现问题的机率</div><div class="line">4 调大复制积压缓冲大小设置repl-backlog-size默认1mb</div><div class="line"> repl-backlog-size是server共享的，建议大于100mb.  这样出现网络闪断，或超时复制中断时，Slave较大可能使用“部分同步”，减少全量同步的影响</div><div class="line">5 rename掉keys等复杂的O(n)命令，避免程序或RD手动执行，导致复制超时</div></pre></td></tr></table></figure></p>
+<h3 id="设置靠谱的监控预警，提前发现隐患"><a href="#设置靠谱的监控预警，提前发现隐患" class="headerlink" title="设置靠谱的监控预警，提前发现隐患"></a>设置靠谱的监控预警，提前发现隐患</h3><p>很多重大疾病，往往在爆发前很长段时间，身体就表现出各种“状况”；如果还不及时就医，就会”病入膏肓”，所以我们每年都要体检一到两次。<br>同理，Redis在出现复制中断前，往往Redis各项“身体指标”又表现不正常了，作为医生的你，是否能及时发现和医治。<br>谈谈Redis的哪些指标异样时，会告诉我们可能中断。关于Redis监控告警，另外写文说明<br><figure class="highlight plain"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div></pre></td><td class="code"><pre><div class="line">1 Redis进程写入流量异常，写入的数据都会转为Redis的[协议RESP](http://redis.io/topics/protocol)同步到从库，通过测试基本每秒写入IO在80MB</div><div class="line">复制因slave同步线程缓冲区达到限制，被Master中断。那我们如何监控Redis进程网络入口IO（2.8高版本中指标）</div><div class="line">total_net_input_bytes 每秒大于30MB就发起告警，如果是正常流量，建议扩容</div><div class="line"></div><div class="line">2 监控最大缓冲区队列长度，直观监控omem是否正常， 详细分析见（two buffer -------)</div><div class="line">client_longest_output_list 建议设置500~1000的告警阈值，这在侧面反馈输出缓冲区的内存大小，但不一定slave同步线程的</div><div class="line"></div><div class="line">3 Master端监控每个Slave的lag值,离最近一次上报数据的秒数，如果过长说明Slave网络断开，或已被大命令卡住了</div><div class="line">  slave_lag 建议10秒阈值</div><div class="line"></div><div class="line">4 Slave端监控Master的master_last_io_seconds_ago,离最近一次发送数据或ping的秒数。如果时间过长说明Master断开，或已被大命令卡住</div><div class="line">  master_last_io_seconds_ago 建议15秒阈值</div></pre></td></tr></table></figure></p>
+<h3 id="制定开发规范和合理容量规划"><a href="#制定开发规范和合理容量规划" class="headerlink" title="制定开发规范和合理容量规划"></a>制定开发规范和合理容量规划</h3><p>这里简单介绍避免复制中断的开发规范<br><figure class="highlight plain"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div></pre></td><td class="code"><pre><div class="line">1 核心集群禁用1mb的String大key，减少操作频率高100KB的key; 集合类的KEY往往多，且不会覆盖全写.</div><div class="line">  如果1mb的key,每秒重复写入50次，就会导致写入网络IO达50MB; 生产大故障遇到一个15MB，以前是1分钟</div><div class="line">  入几次，业务端扩容服务器后1秒写入多次，直接导致复制中断。</div><div class="line">2 程序禁止对大集合类key,进行O(n)的访问模式；比如一个很多字段的hash, 一次hgetall.</div><div class="line">3 容量规划：根据监控容量指标，比较业务写入IO正常增长，应及时拆分扩容</div></pre></td></tr></table></figure></p>
+<h3 id="需proxy或SDK来做过载保护"><a href="#需proxy或SDK来做过载保护" class="headerlink" title="需proxy或SDK来做过载保护"></a>需proxy或SDK来做过载保护</h3><p>详细规范虽制定了，但往往有人故意或无意打破常规；作为后端存储，如果没有强制的自我保护措施，这样只能被FUCK！！！<br>如果因此出现故障，往往就有人吐槽Redis真不行，这种异常都处理不了！！<br>你的要求是：存储key在数10亿级，百万级QPS, P99 latency&lt;1ms, 绝对高可用，多IDC支持，网络分区，数据耐久性高，数据恢复的RPO/RTO……………<br>一不小心，又吐槽两句。</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div></pre></td><td class="code"><pre><div class="line">1 proxy强行过滤1mb的key操作</div><div class="line">2 proxy限流处理</div></pre></td></tr></table></figure>
+<p>[完]</p>
+
+      
+    </div>
+
+    <div>
+      
+        
+
+      
+    </div>
+
+    <div>
+      
+        
+
+      
+    </div>
+
+    <footer class="post-footer">
+      
+        <div class="post-tags">
+          
+            <a href="/tags/Redis/" rel="tag">#Redis</a>
+          
+        </div>
+      
+
+      
+        <div class="post-nav">
+          <div class="post-nav-next post-nav-item">
+            
+              <a href="/2016/07/30/redis-client-two-buffers/" rel="next" title="Redis Client query buffer and output buffer">
+                <i class="fa fa-chevron-left"></i> Redis Client query buffer and output buffer
+              </a>
+            
+          </div>
+
+          <div class="post-nav-prev post-nav-item">
+            
+              <a href="/2016/08/03/redis-cluster-imbalance/" rel="prev" title="Redis Cluster Imbalance">
+                Redis Cluster Imbalance <i class="fa fa-chevron-right"></i>
+              </a>
+            
+          </div>
+        </div>
+      
+
+      
+      
+    </footer>
+  </article>
+
+
+
+    <div class="post-spread">
+      
+        <!-- JiaThis Button BEGIN -->
+<div class="jiathis_style">
+  <a class="jiathis_button_tsina"></a>
+  <a class="jiathis_button_tqq"></a>
+  <a class="jiathis_button_weixin"></a>
+  <a class="jiathis_button_cqq"></a>
+  <a class="jiathis_button_douban"></a>
+  <a class="jiathis_button_renren"></a>
+  <a class="jiathis_button_qzone"></a>
+  <a class="jiathis_button_kaixin001"></a>
+  <a class="jiathis_button_copy"></a>
+  <a href="http://www.jiathis.com/share" class="jiathis jiathis_txt jiathis_separator jtico jtico_jiathis" target="_blank"></a>
+  <a class="jiathis_counter_style"></a>
+</div>
+<script type="text/javascript" >
+  var jiathis_config={
+    hideMore:false
+  }
+</script>
+<script type="text/javascript" src="http://v3.jiathis.com/code/jia.js" charset="utf-8"></script>
+<!-- JiaThis Button END -->
+
+      
+    </div>
+  </div>
+
+
+          </div>
+          
+
+
+          
+  <div class="comments" id="comments">
+    
+      <div class="ds-thread" data-thread-key="2016/07/31/redis-replication-broken-and-loopsync/"
+           data-title="Redis复制中断和无限同步问题" data-url="http://yoursite.com/2016/07/31/redis-replication-broken-and-loopsync/">
+      </div>
+    
+  </div>
+
+
+        </div>
+        
+          
+  
+  <div class="sidebar-toggle">
+    <div class="sidebar-toggle-line-wrap">
+      <span class="sidebar-toggle-line sidebar-toggle-line-first"></span>
+      <span class="sidebar-toggle-line sidebar-toggle-line-middle"></span>
+      <span class="sidebar-toggle-line sidebar-toggle-line-last"></span>
+    </div>
+  </div>
+
+  <aside id="sidebar" class="sidebar">
+    <div class="sidebar-inner">
+
+      
+
+      
+        <ul class="sidebar-nav motion-element">
+          <li class="sidebar-nav-toc sidebar-nav-active" data-target="post-toc-wrap" >
+            文章目录
+          </li>
+          <li class="sidebar-nav-overview" data-target="site-overview">
+            站点概览
+          </li>
+        </ul>
+      
+
+      <section class="site-overview sidebar-panel ">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+          <img class="site-author-image" itemprop="image"
+               src="/uploads/avatar.jpg"
+               alt="Roger Zhuo" />
+          <p class="site-author-name" itemprop="name">Roger Zhuo</p>
+          <p class="site-description motion-element" itemprop="description">汝林的Blog</p>
+        </div>
+        <nav class="site-state motion-element">
+          <div class="site-state-item site-state-posts">
+            <a href="/archives">
+              <span class="site-state-item-count">5</span>
+              <span class="site-state-item-name">日志</span>
+            </a>
+          </div>
+
+          
+            <div class="site-state-item site-state-categories">
+              <a href="/categories">
+                <span class="site-state-item-count">1</span>
+                <span class="site-state-item-name">分类</span>
+              </a>
+            </div>
+          
+
+          
+            <div class="site-state-item site-state-tags">
+              
+                <span class="site-state-item-count">2</span>
+                <span class="site-state-item-name">标签</span>
+              
+            </div>
+          
+
+        </nav>
+
+        
+          <div class="feed-link motion-element">
+            <a href="/atom.xml" rel="alternate">
+              <i class="fa fa-rss"></i>
+              RSS
+            </a>
+          </div>
+        
+
+        <div class="links-of-author motion-element">
+          
+            
+              <span class="links-of-author-item">
+                <a href="https://github.com/ZhuoRoger" target="_blank" title="GitHub">
+                  
+                    <i class="fa fa-fw fa-github"></i>
+                  
+                  GitHub
+                </a>
+              </span>
+            
+              <span class="links-of-author-item">
+                <a href="http://weibo.com/2540962412" target="_blank" title="微博">
+                  
+                    <i class="fa fa-fw fa-globe"></i>
+                  
+                  微博
+                </a>
+              </span>
+            
+          
+        </div>
+
+        
+        
+
+        
+        
+          <div class="links-of-blogroll motion-element links-of-blogroll-inline">
+            <div class="links-of-blogroll-title">
+              <i class="fa  fa-fw fa-globe"></i>
+              
+            </div>
+            <ul class="links-of-blogroll-list">
+              
+                <li class="links-of-blogroll-item">
+                  <a href="https://www.percona.com/blog/" title="Percona" target="_blank">Percona</a>
+                </li>
+              
+            </ul>
+          </div>
+        
+
+      </section>
+
+      
+        <section class="post-toc-wrap motion-element sidebar-panel sidebar-panel-active">
+          <div class="post-toc">
+            
+              
+            
+            
+              <div class="post-toc-content"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#Redis复制中断的影响"><span class="nav-number">1.</span> <span class="nav-text">Redis复制中断的影响</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Redis复制中断场景"><span class="nav-number">2.</span> <span class="nav-text">Redis复制中断场景</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#Slave客户端的Client-output-buffer达到大小限制被Master强制Kill"><span class="nav-number">2.1.</span> <span class="nav-text">Slave客户端的Client output buffer达到大小限制被Master强制Kill</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link" href="#输出缓冲区"><span class="nav-number">2.1.1.</span> <span class="nav-text">输出缓冲区</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#client-output-buffer-limit"><span class="nav-number">2.1.2.</span> <span class="nav-text">client-output-buffer-limit</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#Master因slave-client输出缓冲区中断复制的现象"><span class="nav-number">2.1.3.</span> <span class="nav-text">Master因slave client输出缓冲区中断复制的现象</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#导致输出缓冲区达到限制的场景"><span class="nav-number">2.1.4.</span> <span class="nav-text">导致输出缓冲区达到限制的场景</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#因输出缓冲区导致复制中断故障处理"><span class="nav-number">2.1.5.</span> <span class="nav-text">因输出缓冲区导致复制中断故障处理</span></a></li></ol></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Master-Slave因复制超时，导致复制中断"><span class="nav-number">2.2.</span> <span class="nav-text">Master-Slave因复制超时，导致复制中断</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link" href="#Master与Slave间的心跳检测"><span class="nav-number">2.2.1.</span> <span class="nav-text">Master与Slave间的心跳检测</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#Redis判断复制超时的3个角度"><span class="nav-number">2.2.2.</span> <span class="nav-text">Redis判断复制超时的3个角度</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#导致复制超时的场景"><span class="nav-number">2.2.3.</span> <span class="nav-text">导致复制超时的场景</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#复制超时的故障处理"><span class="nav-number">2.2.4.</span> <span class="nav-text">复制超时的故障处理</span></a></li></ol></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#无限次循环复制"><span class="nav-number">3.</span> <span class="nav-text">无限次循环复制</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#怎么规避和提前发现复制同步异常"><span class="nav-number">4.</span> <span class="nav-text">怎么规避和提前发现复制同步异常</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#针对复制中断问题，设置合理的配置参数"><span class="nav-number">4.1.</span> <span class="nav-text">针对复制中断问题，设置合理的配置参数</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#设置靠谱的监控预警，提前发现隐患"><span class="nav-number">4.2.</span> <span class="nav-text">设置靠谱的监控预警，提前发现隐患</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#制定开发规范和合理容量规划"><span class="nav-number">4.3.</span> <span class="nav-text">制定开发规范和合理容量规划</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#需proxy或SDK来做过载保护"><span class="nav-number">4.4.</span> <span class="nav-text">需proxy或SDK来做过载保护</span></a></li></ol></li></ol></div>
+            
+          </div>
+        </section>
+      
+
+    </div>
+  </aside>
+
+
+        
+      </div>
+    </main>
+
+    <footer id="footer" class="footer">
+      <div class="footer-inner">
+        <div class="copyright" >
+  
+  &copy; 
+  <span itemprop="copyrightYear">2016</span>
+  <span class="with-love">
+    <i class="fa fa-heart"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">Roger Zhuo</span>
+</div>
+
+<div class="powered-by">
+  由 <a class="theme-link" href="https://hexo.io">Hexo</a> 强力驱动
+</div>
+
+<div class="theme-info">
+  主题 -
+  <a class="theme-link" href="https://github.com/iissnan/hexo-theme-next">
+    NexT.Mist
+  </a>
+</div>
+
+        
+
+<div class="busuanzi-count">
+
+  <script async src="https://dn-lbstatics.qbox.me/busuanzi/2.3/busuanzi.pure.mini.js"></script>
+
+  
+    <span class="site-uv"><i class="fa fa-user"></i><span class="busuanzi-value" id="busuanzi_value_site_uv"></span></span>
+  
+
+  
+    <span class="site-pv"><i class="fa fa-eye"></i><span class="busuanzi-value" id="busuanzi_value_site_pv"></span></span>
+  
+  
+</div>
+
+
+
+        
+      </div>
+    </footer>
+
+    <div class="back-to-top">
+      <i class="fa fa-arrow-up"></i>
+    </div>
+  </div>
+
+  
+
+<script type="text/javascript">
+  if (Object.prototype.toString.call(window.Promise) !== '[object Function]') {
+    window.Promise = null;
+  }
+</script>
+
+
+
+
+
+
+
+
+
+  
+
+
+
+  
+  <script type="text/javascript" src="/vendors/jquery/index.js?v=2.1.3"></script>
+
+  
+  <script type="text/javascript" src="/vendors/fastclick/lib/fastclick.min.js?v=1.0.6"></script>
+
+  
+  <script type="text/javascript" src="/vendors/jquery_lazyload/jquery.lazyload.js?v=1.9.7"></script>
+
+  
+  <script type="text/javascript" src="/vendors/velocity/velocity.min.js?v=1.2.1"></script>
+
+  
+  <script type="text/javascript" src="/vendors/velocity/velocity.ui.min.js?v=1.2.1"></script>
+
+  
+  <script type="text/javascript" src="/vendors/fancybox/source/jquery.fancybox.pack.js?v=2.1.5"></script>
+
+
+  
+
+
+  <script type="text/javascript" src="/js/src/utils.js?v=5.0.1"></script>
+
+  <script type="text/javascript" src="/js/src/motion.js?v=5.0.1"></script>
+
+
+
+  
+  
+
+  
+  <script type="text/javascript" src="/js/src/scrollspy.js?v=5.0.1"></script>
+<script type="text/javascript" src="/js/src/post-details.js?v=5.0.1"></script>
+
+
+
+  
+
+
+  <script type="text/javascript" src="/js/src/bootstrap.js?v=5.0.1"></script>
+
+
+
+  
+
+  
+    
+  
+
+  <script type="text/javascript">
+    var duoshuoQuery = {short_name:"rogerzhuo"};
+    (function() {
+      var ds = document.createElement('script');
+      ds.type = 'text/javascript';ds.async = true;
+      ds.id = 'duoshuo-script';
+      ds.src = (document.location.protocol == 'https:' ? 'https:' : 'http:') + '//static.duoshuo.com/embed.js';
+      ds.charset = 'UTF-8';
+      (document.getElementsByTagName('head')[0]
+      || document.getElementsByTagName('body')[0]).appendChild(ds);
+    })();
+  </script>
+
+  
+    
+    <script src="/vendors/ua-parser-js/dist/ua-parser.min.js?v=0.7.9"></script>
+    <script src="/js/src/hook-duoshuo.js"></script>
+  
+
+
+
+
+
+
+  
+  
+
+  
+
+  
+
+  
+
+</body>
+</html>

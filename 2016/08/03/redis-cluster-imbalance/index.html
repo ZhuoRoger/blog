@@ -1,0 +1,759 @@
+<!doctype html>
+
+
+
+  
+
+
+<html class="theme-next mist use-motion">
+<head>
+  <meta charset="UTF-8"/>
+<meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1"/>
+
+
+
+<meta http-equiv="Cache-Control" content="no-transform" />
+<meta http-equiv="Cache-Control" content="no-siteapp" />
+
+
+
+
+
+
+
+
+
+
+
+
+  
+  
+  <link href="/vendors/fancybox/source/jquery.fancybox.css?v=2.1.5" rel="stylesheet" type="text/css" />
+
+
+
+
+  
+  
+  
+  
+
+  
+    
+    
+  
+
+  
+
+  
+
+  
+
+  
+
+  
+    
+    
+    <link href="//fonts.googleapis.com/css?family=Lato:300,300italic,400,400italic,700,700italic&subset=latin,latin-ext" rel="stylesheet" type="text/css">
+  
+
+
+
+
+
+
+<link href="/vendors/font-awesome/css/font-awesome.min.css?v=4.4.0" rel="stylesheet" type="text/css" />
+
+<link href="/css/main.css?v=5.0.1" rel="stylesheet" type="text/css" />
+
+
+  <meta name="keywords" content="Redis," />
+
+
+
+
+
+  <link rel="alternate" href="/atom.xml" title="今天" type="application/atom+xml" />
+
+
+
+
+  <link rel="shortcut icon" type="image/x-icon" href="/favicon.ico?v=5.0.1" />
+
+
+
+
+
+
+<meta name="description" content="对分布式存储系统的架构和运维管理，如何保证每个Node的数据存储容量和请求量尽量均衡，是非常重要的。本文介绍Redis大集群运维过程中，常见导致数据和请求量“倾斜”的场景，及规避措施。
+
+Redis数据容量或请求量严重”倾斜”的影响以下从运维的角度解释，Redis数十节点的集群，出现数据容量和请求量倾斜情况下，存在的一些痛点:
+
+少数或单个节点请求量”过热”，导致Redis分布式系统失去可扩展性能">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Redis Cluster Imbalance">
+<meta property="og:url" content="http://yoursite.com/2016/08/03/redis-cluster-imbalance/index.html">
+<meta property="og:site_name" content="今天">
+<meta property="og:description" content="对分布式存储系统的架构和运维管理，如何保证每个Node的数据存储容量和请求量尽量均衡，是非常重要的。本文介绍Redis大集群运维过程中，常见导致数据和请求量“倾斜”的场景，及规避措施。
+
+Redis数据容量或请求量严重”倾斜”的影响以下从运维的角度解释，Redis数十节点的集群，出现数据容量和请求量倾斜情况下，存在的一些痛点:
+
+少数或单个节点请求量”过热”，导致Redis分布式系统失去可扩展性能">
+<meta property="og:updated_time" content="2016-08-09T12:52:26.000Z">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="Redis Cluster Imbalance">
+<meta name="twitter:description" content="对分布式存储系统的架构和运维管理，如何保证每个Node的数据存储容量和请求量尽量均衡，是非常重要的。本文介绍Redis大集群运维过程中，常见导致数据和请求量“倾斜”的场景，及规避措施。
+
+Redis数据容量或请求量严重”倾斜”的影响以下从运维的角度解释，Redis数十节点的集群，出现数据容量和请求量倾斜情况下，存在的一些痛点:
+
+少数或单个节点请求量”过热”，导致Redis分布式系统失去可扩展性能">
+
+
+
+<script type="text/javascript" id="hexo.configuration">
+  var NexT = window.NexT || {};
+  var CONFIG = {
+    scheme: 'Mist',
+    sidebar: {"position":"left","display":"post"},
+    fancybox: true,
+    motion: true,
+    duoshuo: {
+      userId: 6316444262204442000,
+      author: '今天'
+    }
+  };
+</script>
+
+
+
+
+  <link rel="canonical" href="http://yoursite.com/2016/08/03/redis-cluster-imbalance/"/>
+
+  <title> Redis Cluster Imbalance | 今天 </title>
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage" lang="zh-Hans">
+
+  
+
+
+
+
+
+
+
+
+
+
+  
+  
+    
+  
+
+  <div class="container one-collumn sidebar-position-left page-post-detail ">
+    <div class="headband"></div>
+
+    <header id="header" class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-meta ">
+  
+
+  <div class="custom-logo-site-title">
+    <a href="/"  class="brand" rel="start">
+      <span class="logo-line-before"><i></i></span>
+      <span class="site-title">今天</span>
+      <span class="logo-line-after"><i></i></span>
+    </a>
+  </div>
+  <p class="site-subtitle"></p>
+</div>
+
+<div class="site-nav-toggle">
+  <button>
+    <span class="btn-bar"></span>
+    <span class="btn-bar"></span>
+    <span class="btn-bar"></span>
+  </button>
+</div>
+
+<nav class="site-nav">
+  
+
+  
+    <ul id="menu" class="menu">
+      
+        
+        <li class="menu-item menu-item-home">
+          <a href="/" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-home"></i> <br />
+            
+            首页
+          </a>
+        </li>
+      
+        
+        <li class="menu-item menu-item-categories">
+          <a href="/categories" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-th"></i> <br />
+            
+            分类
+          </a>
+        </li>
+      
+        
+        <li class="menu-item menu-item-archives">
+          <a href="/archives" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-archive"></i> <br />
+            
+            归档
+          </a>
+        </li>
+      
+        
+        <li class="menu-item menu-item-books">
+          <a href="/books" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-heartbeat"></i> <br />
+            
+            书单
+          </a>
+        </li>
+      
+
+      
+    </ul>
+  
+
+  
+</nav>
+
+ </div>
+    </header>
+
+    <main id="main" class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          <div id="content" class="content">
+            
+
+  <div id="posts" class="posts-expand">
+    
+
+  
+  
+
+  
+  
+  
+
+  <article class="post post-type-normal " itemscope itemtype="http://schema.org/Article">
+
+    
+      <header class="post-header">
+
+        
+        
+          <h1 class="post-title" itemprop="name headline">
+            
+            
+              
+                Redis Cluster Imbalance
+              
+            
+          </h1>
+        
+
+        <div class="post-meta">
+          <span class="post-time">
+            <span class="post-meta-item-icon">
+              <i class="fa fa-calendar-o"></i>
+            </span>
+            <span class="post-meta-item-text">发表于</span>
+            <time itemprop="dateCreated" datetime="2016-08-03T23:50:00+08:00" content="2016-08-03">
+              2016-08-03
+            </time>
+          </span>
+
+          
+            <span class="post-category" >
+              &nbsp; | &nbsp;
+              <span class="post-meta-item-icon">
+                <i class="fa fa-folder-o"></i>
+              </span>
+              <span class="post-meta-item-text">分类于</span>
+              
+                <span itemprop="about" itemscope itemtype="https://schema.org/Thing">
+                  <a href="/categories/Redis/" itemprop="url" rel="index">
+                    <span itemprop="name">Redis</span>
+                  </a>
+                </span>
+
+                
+                
+
+              
+            </span>
+          
+
+          
+            
+              <span class="post-comments-count">
+                &nbsp; | &nbsp;
+                <a href="/2016/08/03/redis-cluster-imbalance/#comments" itemprop="discussionUrl">
+                  <span class="post-comments-count ds-thread-count" data-thread-key="2016/08/03/redis-cluster-imbalance/" itemprop="commentsCount"></span>
+                </a>
+              </span>
+            
+          
+
+          
+
+          
+          
+
+          
+              &nbsp; | &nbsp;
+              <span class="page-pv"><i class="fa fa-file-o"></i>
+              <span class="busuanzi-value" id="busuanzi_value_page_pv" ></span>
+              </span>
+          
+        </div>
+      </header>
+    
+
+
+    <div class="post-body" itemprop="articleBody">
+
+      
+      
+
+      
+        <p>对分布式存储系统的架构和运维管理，如何保证每个Node的数据存储容量和请求量尽量均衡，是非常重要的。<br>本文介绍Redis大集群运维过程中，常见导致数据和请求量“倾斜”的场景，及规避措施。</p>
+<hr>
+<h2 id="Redis数据容量或请求量严重”倾斜”的影响"><a href="#Redis数据容量或请求量严重”倾斜”的影响" class="headerlink" title="Redis数据容量或请求量严重”倾斜”的影响"></a>Redis数据容量或请求量严重”倾斜”的影响</h2><p>以下从运维的角度解释，Redis数十节点的集群，出现数据容量和请求量倾斜情况下，存在的一些痛点:</p>
+<ul>
+<li>少数或单个节点请求量”过热”，导致Redis分布式系统失去可扩展性能力和集群的意义。类似MongoDB_id字段作为片键。</li>
+<li>导致运维容量规划，扩容处理难度大。</li>
+<li>增大自动化配置管理难度；单集群节点尽量统一参数配置。</li>
+<li>监控告警复杂(容量，QPS，连接数的阈值等)</li>
+</ul>
+<p>那我们再看生产环境中，常见导致Redis集群严重“倾斜”的场景</p>
+<h2 id="Redis集群常见“倾斜”的场景"><a href="#Redis集群常见“倾斜”的场景" class="headerlink" title="Redis集群常见“倾斜”的场景"></a>Redis集群常见“倾斜”的场景</h2><p>这类问题一般DBA规划不当，业务键空间(keyspace)设计不合理等问题导致</p>
+<ul>
+<li>DBA在规划集群时或扩容后，导致数据槽(哈希桶)位分配不均匀；引起内存容量、键个数和请求QPS倾斜</li>
+<li>业务的键空间设计不合理，所谓”热点key”,导致某少量KEY的QPS操作很大；这类节点QPS过载</li>
+<li>程序大量使用<a href="http://redis.io/topics/cluster-spec" target="_blank" rel="external">Keys hash tags</a>, 可能导致某些数据槽位的键个数较多</li>
+<li>程序存在大的集群key(hash,set,list等)，导致大key所在节点的容量和QPS过高</li>
+<li>工和师执行Monitor这类命令，导致当前节点client输出缓冲区增大；used_memory_rss被撑大；导致节点内存容量增大</li>
+</ul>
+<p>接下来，当集群出现内存容量、键数量或QPS请求量严重倾斜时，我们应该排查定位问题呢？</p>
+<h2 id="Redis集群“倾斜”问题排查"><a href="#Redis集群“倾斜”问题排查" class="headerlink" title="Redis集群“倾斜”问题排查"></a>Redis集群“倾斜”问题排查</h2><h3 id="检查集群每个分片的数据槽分配是否均匀"><a href="#检查集群每个分片的数据槽分配是否均匀" class="headerlink" title="检查集群每个分片的数据槽分配是否均匀"></a>检查集群每个分片的数据槽分配是否均匀</h3><p>下面以Redis Cluster集群为例<br>确认集群中，每个节点负责的数据槽位(slots)和key个数。下面demo的部分实例存在不轻度“倾斜”<br>但不严重，可考虑进行reblance.<br><figure class="highlight plain"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div></pre></td><td class="code"><pre><div class="line">redis-trib.rb info redis_ip:port</div><div class="line">nodeip:port (5e59101a...) -&gt; 44357924 keys | 617 slots | 1 slaves.</div><div class="line">nodeip:port (72f686aa...) -&gt; 52257829 keys | 726 slots | 1 slaves.</div><div class="line">nodeip:port (d1e4ac02...) -&gt; 45137046 keys | 627 slots | 1 slaves.</div><div class="line">---------------------省略------------------------</div><div class="line">nodeip:port (f87076c1...) -&gt; 44433892 keys | 617 slots | 1 slaves.</div><div class="line">nodeip:port (a7801b06...) -&gt; 44418216 keys | 619 slots | 1 slaves.</div><div class="line">nodeip:port (400bbd47...) -&gt; 45318509 keys | 614 slots | 1 slaves.</div><div class="line">nodeip:port (c90a36c9...) -&gt; 44417794 keys | 617 slots | 1 slaves.</div><div class="line">[OK] 1186817927 keys in 25 masters.</div><div class="line">72437.62 keys per slot on average.</div></pre></td></tr></table></figure></p>
+<h3 id="排查节点热点Key-确定top-commands"><a href="#排查节点热点Key-确定top-commands" class="headerlink" title="排查节点热点Key,确定top commands."></a>排查节点热点Key,确定top commands.</h3><p> 使用<a href="https://github.com/facebookarchive/redis-faina" target="_blank" rel="external">redis-faina</a>,当然有实时分析平台就更好。<br>从以下示例中，可见两个前缀key的QPS占比基本各为50%, 明显热点key；也能看到auth命令的异常(top commands)<br><figure class="highlight plain"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div></pre></td><td class="code"><pre><div class="line">Overall Stats</div><div class="line">========================================</div><div class="line">Lines Processed         100000</div><div class="line">Commands/Sec            7276.82</div><div class="line"></div><div class="line">Top Prefixes</div><div class="line">========================================</div><div class="line">ar_xxx     49849   (49.85%)</div><div class="line"></div><div class="line">Top Keys</div><div class="line">========================================</div><div class="line">c8a87fxxxxx                                49943   (49.94%)</div><div class="line">a_r:xxxx                                    49849   (49.85%)</div><div class="line"></div><div class="line">Top Commands</div><div class="line">========================================</div><div class="line">GET             49964   (49.96%)</div><div class="line">AUTH            49943   (49.94%)</div><div class="line">SELECT          88      (0.09%)</div></pre></td></tr></table></figure></p>
+<h3 id="程序是否大量使用Keys-hash-tags"><a href="#程序是否大量使用Keys-hash-tags" class="headerlink" title="程序是否大量使用Keys hash tags"></a>程序是否大量使用Keys hash tags</h3><p>可能导致数据存储内存量，QPS都不均匀的问题；<br>可使用scan扫描keyspace是否有使用hash tags的，或使用monitor,<a href="https://www.vividcortex.com/resources/network-analyzer-for-redis" target="_blank" rel="external">vc-redis-sniffer</a></p>
+<h3 id="程序是否使用较大的集合键"><a href="#程序是否使用较大的集合键" class="headerlink" title="程序是否使用较大的集合键"></a>程序是否使用较大的集合键</h3><p>比如1kw个字段的hash key, 内存占用在几个GB. 这类集合key每次操作几个字段，很难从proxy或sdk发现key的大小。 可通过redis-cli –bigkeys<br><figure class="highlight plain"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div></pre></td><td class="code"><pre><div class="line">redis-cli  --bigkeys -p 7000                                 </div><div class="line"></div><div class="line"># Scanning the entire keyspace to find biggest keys as well as</div><div class="line"># average sizes per key type.  You can use -i 0.1 to sleep 0.1 sec</div><div class="line"># per 100 SCAN commands (not usually needed).</div><div class="line"></div><div class="line">[00.00%] Biggest string found so far &apos;key:000000019996&apos; with 1024 bytes</div><div class="line">[48.57%] Biggest list   found so far &apos;mylist&apos; with 534196 items</div><div class="line"></div><div class="line">-------- summary -------</div><div class="line">Sampled 8265 keys in the keyspace!</div><div class="line">Total key length in bytes is 132234 (avg len 16.00)</div><div class="line"></div><div class="line">Biggest string found &apos;key:000000019996&apos; has 1024 bytes</div><div class="line">Biggest   list found &apos;mylist&apos; has 534196 items</div><div class="line"></div><div class="line">8264 strings with 8460296 bytes (99.99% of keys, avg size 1023.75)</div><div class="line">1 lists with 534196 items (00.01% of keys, avg size 534196.00)</div></pre></td></tr></table></figure></p>
+<h3 id="确认是否因monitor命令引起的输出缓冲区占用内存过大的问题"><a href="#确认是否因monitor命令引起的输出缓冲区占用内存过大的问题" class="headerlink" title="确认是否因monitor命令引起的输出缓冲区占用内存过大的问题"></a>确认是否因monitor命令引起的输出缓冲区占用内存过大的问题</h3><p>这类情况基本Redis实例内存会快速增长，很快会出现回落。通过监测client输出缓冲区使用情况</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div></pre></td><td class="code"><pre><div class="line">2.5.1 通过监控client_longest_output_list输出列表的长度，是否有client使用大量的输出缓冲区.</div><div class="line">redis-cli  -p 7000 info clients</div><div class="line"># Clients</div><div class="line">connected_clients:52</div><div class="line">client_longest_output_list:9179</div><div class="line">client_biggest_input_buf:0</div><div class="line">blocked_clients:0</div><div class="line"></div><div class="line">2.5.2 查看输出缓冲区列表长度不为0的client。 可见monitor占用输出缓冲区370MB</div><div class="line">redis-cli  -p 7000 client list | grep -v &quot;oll=0&quot;</div><div class="line">id=1840 addr=xx64598  age=75 idle=0 flags=O obl=0 oll=15234 omem=374930608 cmd=monitor</div></pre></td></tr></table></figure>
+<h2 id="如何有效避免Redis集群“倾斜”问题"><a href="#如何有效避免Redis集群“倾斜”问题" class="headerlink" title="如何有效避免Redis集群“倾斜”问题"></a>如何有效避免Redis集群“倾斜”问题</h2><ul>
+<li>集群部署和扩容处理，保证数据槽位分配平均</li>
+<li>keyspace设计时，如何避免热点key, 打散热key</li>
+<li>业务在键空间设计时，中尽量避免使用大的集合类型的Key，把key设计拆分</li>
+<li>程序角度尽量避免使用keys hash tag</li>
+<li>避免工程师直接使用keys,monitor等命令，导致输出缓冲区堆积.</li>
+<li>合量配置normal的client output buffer, 建议设置10mb(警示:和业务确认调整再修改，避免业务出错)</li>
+</ul>
+<p>在实际生产业务场景中，大规模集群很难做到集群的完全均衡，只是尽量保证不出现严重倾斜问题。</p>
+
+      
+    </div>
+
+    <div>
+      
+        
+
+      
+    </div>
+
+    <div>
+      
+        
+
+      
+    </div>
+
+    <footer class="post-footer">
+      
+        <div class="post-tags">
+          
+            <a href="/tags/Redis/" rel="tag">#Redis</a>
+          
+        </div>
+      
+
+      
+        <div class="post-nav">
+          <div class="post-nav-next post-nav-item">
+            
+              <a href="/2016/07/31/redis-replication-broken-and-loopsync/" rel="next" title="Redis复制中断和无限同步问题">
+                <i class="fa fa-chevron-left"></i> Redis复制中断和无限同步问题
+              </a>
+            
+          </div>
+
+          <div class="post-nav-prev post-nav-item">
+            
+              <a href="/2016/08/05/redis-useless-keys/" rel="prev" title="Redis的“死键”问题">
+                Redis的“死键”问题 <i class="fa fa-chevron-right"></i>
+              </a>
+            
+          </div>
+        </div>
+      
+
+      
+      
+    </footer>
+  </article>
+
+
+
+    <div class="post-spread">
+      
+        <!-- JiaThis Button BEGIN -->
+<div class="jiathis_style">
+  <a class="jiathis_button_tsina"></a>
+  <a class="jiathis_button_tqq"></a>
+  <a class="jiathis_button_weixin"></a>
+  <a class="jiathis_button_cqq"></a>
+  <a class="jiathis_button_douban"></a>
+  <a class="jiathis_button_renren"></a>
+  <a class="jiathis_button_qzone"></a>
+  <a class="jiathis_button_kaixin001"></a>
+  <a class="jiathis_button_copy"></a>
+  <a href="http://www.jiathis.com/share" class="jiathis jiathis_txt jiathis_separator jtico jtico_jiathis" target="_blank"></a>
+  <a class="jiathis_counter_style"></a>
+</div>
+<script type="text/javascript" >
+  var jiathis_config={
+    hideMore:false
+  }
+</script>
+<script type="text/javascript" src="http://v3.jiathis.com/code/jia.js" charset="utf-8"></script>
+<!-- JiaThis Button END -->
+
+      
+    </div>
+  </div>
+
+
+          </div>
+          
+
+
+          
+  <div class="comments" id="comments">
+    
+      <div class="ds-thread" data-thread-key="2016/08/03/redis-cluster-imbalance/"
+           data-title="Redis Cluster Imbalance" data-url="http://yoursite.com/2016/08/03/redis-cluster-imbalance/">
+      </div>
+    
+  </div>
+
+
+        </div>
+        
+          
+  
+  <div class="sidebar-toggle">
+    <div class="sidebar-toggle-line-wrap">
+      <span class="sidebar-toggle-line sidebar-toggle-line-first"></span>
+      <span class="sidebar-toggle-line sidebar-toggle-line-middle"></span>
+      <span class="sidebar-toggle-line sidebar-toggle-line-last"></span>
+    </div>
+  </div>
+
+  <aside id="sidebar" class="sidebar">
+    <div class="sidebar-inner">
+
+      
+
+      
+        <ul class="sidebar-nav motion-element">
+          <li class="sidebar-nav-toc sidebar-nav-active" data-target="post-toc-wrap" >
+            文章目录
+          </li>
+          <li class="sidebar-nav-overview" data-target="site-overview">
+            站点概览
+          </li>
+        </ul>
+      
+
+      <section class="site-overview sidebar-panel ">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+          <img class="site-author-image" itemprop="image"
+               src="/uploads/avatar.jpg"
+               alt="Roger Zhuo" />
+          <p class="site-author-name" itemprop="name">Roger Zhuo</p>
+          <p class="site-description motion-element" itemprop="description">汝林的Blog</p>
+        </div>
+        <nav class="site-state motion-element">
+          <div class="site-state-item site-state-posts">
+            <a href="/archives">
+              <span class="site-state-item-count">5</span>
+              <span class="site-state-item-name">日志</span>
+            </a>
+          </div>
+
+          
+            <div class="site-state-item site-state-categories">
+              <a href="/categories">
+                <span class="site-state-item-count">1</span>
+                <span class="site-state-item-name">分类</span>
+              </a>
+            </div>
+          
+
+          
+            <div class="site-state-item site-state-tags">
+              
+                <span class="site-state-item-count">2</span>
+                <span class="site-state-item-name">标签</span>
+              
+            </div>
+          
+
+        </nav>
+
+        
+          <div class="feed-link motion-element">
+            <a href="/atom.xml" rel="alternate">
+              <i class="fa fa-rss"></i>
+              RSS
+            </a>
+          </div>
+        
+
+        <div class="links-of-author motion-element">
+          
+            
+              <span class="links-of-author-item">
+                <a href="https://github.com/ZhuoRoger" target="_blank" title="GitHub">
+                  
+                    <i class="fa fa-fw fa-github"></i>
+                  
+                  GitHub
+                </a>
+              </span>
+            
+              <span class="links-of-author-item">
+                <a href="http://weibo.com/2540962412" target="_blank" title="微博">
+                  
+                    <i class="fa fa-fw fa-globe"></i>
+                  
+                  微博
+                </a>
+              </span>
+            
+          
+        </div>
+
+        
+        
+
+        
+        
+          <div class="links-of-blogroll motion-element links-of-blogroll-inline">
+            <div class="links-of-blogroll-title">
+              <i class="fa  fa-fw fa-globe"></i>
+              
+            </div>
+            <ul class="links-of-blogroll-list">
+              
+                <li class="links-of-blogroll-item">
+                  <a href="https://www.percona.com/blog/" title="Percona" target="_blank">Percona</a>
+                </li>
+              
+            </ul>
+          </div>
+        
+
+      </section>
+
+      
+        <section class="post-toc-wrap motion-element sidebar-panel sidebar-panel-active">
+          <div class="post-toc">
+            
+              
+            
+            
+              <div class="post-toc-content"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#Redis数据容量或请求量严重”倾斜”的影响"><span class="nav-number">1.</span> <span class="nav-text">Redis数据容量或请求量严重”倾斜”的影响</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Redis集群常见“倾斜”的场景"><span class="nav-number">2.</span> <span class="nav-text">Redis集群常见“倾斜”的场景</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Redis集群“倾斜”问题排查"><span class="nav-number">3.</span> <span class="nav-text">Redis集群“倾斜”问题排查</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#检查集群每个分片的数据槽分配是否均匀"><span class="nav-number">3.1.</span> <span class="nav-text">检查集群每个分片的数据槽分配是否均匀</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#排查节点热点Key-确定top-commands"><span class="nav-number">3.2.</span> <span class="nav-text">排查节点热点Key,确定top commands.</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#程序是否大量使用Keys-hash-tags"><span class="nav-number">3.3.</span> <span class="nav-text">程序是否大量使用Keys hash tags</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#程序是否使用较大的集合键"><span class="nav-number">3.4.</span> <span class="nav-text">程序是否使用较大的集合键</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#确认是否因monitor命令引起的输出缓冲区占用内存过大的问题"><span class="nav-number">3.5.</span> <span class="nav-text">确认是否因monitor命令引起的输出缓冲区占用内存过大的问题</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#如何有效避免Redis集群“倾斜”问题"><span class="nav-number">4.</span> <span class="nav-text">如何有效避免Redis集群“倾斜”问题</span></a></li></ol></div>
+            
+          </div>
+        </section>
+      
+
+    </div>
+  </aside>
+
+
+        
+      </div>
+    </main>
+
+    <footer id="footer" class="footer">
+      <div class="footer-inner">
+        <div class="copyright" >
+  
+  &copy; 
+  <span itemprop="copyrightYear">2016</span>
+  <span class="with-love">
+    <i class="fa fa-heart"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">Roger Zhuo</span>
+</div>
+
+<div class="powered-by">
+  由 <a class="theme-link" href="https://hexo.io">Hexo</a> 强力驱动
+</div>
+
+<div class="theme-info">
+  主题 -
+  <a class="theme-link" href="https://github.com/iissnan/hexo-theme-next">
+    NexT.Mist
+  </a>
+</div>
+
+        
+
+<div class="busuanzi-count">
+
+  <script async src="https://dn-lbstatics.qbox.me/busuanzi/2.3/busuanzi.pure.mini.js"></script>
+
+  
+    <span class="site-uv"><i class="fa fa-user"></i><span class="busuanzi-value" id="busuanzi_value_site_uv"></span></span>
+  
+
+  
+    <span class="site-pv"><i class="fa fa-eye"></i><span class="busuanzi-value" id="busuanzi_value_site_pv"></span></span>
+  
+  
+</div>
+
+
+
+        
+      </div>
+    </footer>
+
+    <div class="back-to-top">
+      <i class="fa fa-arrow-up"></i>
+    </div>
+  </div>
+
+  
+
+<script type="text/javascript">
+  if (Object.prototype.toString.call(window.Promise) !== '[object Function]') {
+    window.Promise = null;
+  }
+</script>
+
+
+
+
+
+
+
+
+
+  
+
+
+
+  
+  <script type="text/javascript" src="/vendors/jquery/index.js?v=2.1.3"></script>
+
+  
+  <script type="text/javascript" src="/vendors/fastclick/lib/fastclick.min.js?v=1.0.6"></script>
+
+  
+  <script type="text/javascript" src="/vendors/jquery_lazyload/jquery.lazyload.js?v=1.9.7"></script>
+
+  
+  <script type="text/javascript" src="/vendors/velocity/velocity.min.js?v=1.2.1"></script>
+
+  
+  <script type="text/javascript" src="/vendors/velocity/velocity.ui.min.js?v=1.2.1"></script>
+
+  
+  <script type="text/javascript" src="/vendors/fancybox/source/jquery.fancybox.pack.js?v=2.1.5"></script>
+
+
+  
+
+
+  <script type="text/javascript" src="/js/src/utils.js?v=5.0.1"></script>
+
+  <script type="text/javascript" src="/js/src/motion.js?v=5.0.1"></script>
+
+
+
+  
+  
+
+  
+  <script type="text/javascript" src="/js/src/scrollspy.js?v=5.0.1"></script>
+<script type="text/javascript" src="/js/src/post-details.js?v=5.0.1"></script>
+
+
+
+  
+
+
+  <script type="text/javascript" src="/js/src/bootstrap.js?v=5.0.1"></script>
+
+
+
+  
+
+  
+    
+  
+
+  <script type="text/javascript">
+    var duoshuoQuery = {short_name:"rogerzhuo"};
+    (function() {
+      var ds = document.createElement('script');
+      ds.type = 'text/javascript';ds.async = true;
+      ds.id = 'duoshuo-script';
+      ds.src = (document.location.protocol == 'https:' ? 'https:' : 'http:') + '//static.duoshuo.com/embed.js';
+      ds.charset = 'UTF-8';
+      (document.getElementsByTagName('head')[0]
+      || document.getElementsByTagName('body')[0]).appendChild(ds);
+    })();
+  </script>
+
+  
+    
+    <script src="/vendors/ua-parser-js/dist/ua-parser.min.js?v=0.7.9"></script>
+    <script src="/js/src/hook-duoshuo.js"></script>
+  
+
+
+
+
+
+
+  
+  
+
+  
+
+  
+
+  
+
+</body>
+</html>
