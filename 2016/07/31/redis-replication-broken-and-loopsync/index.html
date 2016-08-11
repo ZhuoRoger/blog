@@ -86,22 +86,16 @@
 
 
 
-<meta name="description" content="很多常见数据库(含NoSQL)都用复制技术的多机结构，以实现数据冗余、高可用、数据备份和多地域读取等；如MySQL/MongoDB/Redis, 所以复制中断异常的Troubleshtooing和预案都是DBA们常常聊话题。本文主要写Redis较常见的两种复制中断，以及导致反复无限次同步。
-
-Redis复制中断的影响Redis复制中断后，Slave会立即发起psync,psync尝试部署同步不成功">
+<meta name="description" content="很多常见数据库(含NoSQL)都用复制技术的多机结构，以实现数据冗余、高可用、数据备份和多地域读取等；如MySQL/MongoDB/Redis, 所以复制中断异常的Troubleshtooing和预案都是DBA们常常聊话题。本文主要写Redis较常见的两种复制中断，以及导致反复无限次同步。">
 <meta property="og:type" content="article">
 <meta property="og:title" content="Redis复制中断和无限同步问题">
 <meta property="og:url" content="http://yoursite.com/2016/07/31/redis-replication-broken-and-loopsync/index.html">
 <meta property="og:site_name" content="今天">
-<meta property="og:description" content="很多常见数据库(含NoSQL)都用复制技术的多机结构，以实现数据冗余、高可用、数据备份和多地域读取等；如MySQL/MongoDB/Redis, 所以复制中断异常的Troubleshtooing和预案都是DBA们常常聊话题。本文主要写Redis较常见的两种复制中断，以及导致反复无限次同步。
-
-Redis复制中断的影响Redis复制中断后，Slave会立即发起psync,psync尝试部署同步不成功">
-<meta property="og:updated_time" content="2016-08-09T12:40:50.000Z">
+<meta property="og:description" content="很多常见数据库(含NoSQL)都用复制技术的多机结构，以实现数据冗余、高可用、数据备份和多地域读取等；如MySQL/MongoDB/Redis, 所以复制中断异常的Troubleshtooing和预案都是DBA们常常聊话题。本文主要写Redis较常见的两种复制中断，以及导致反复无限次同步。">
+<meta property="og:updated_time" content="2016-08-11T12:12:50.000Z">
 <meta name="twitter:card" content="summary">
 <meta name="twitter:title" content="Redis复制中断和无限同步问题">
-<meta name="twitter:description" content="很多常见数据库(含NoSQL)都用复制技术的多机结构，以实现数据冗余、高可用、数据备份和多地域读取等；如MySQL/MongoDB/Redis, 所以复制中断异常的Troubleshtooing和预案都是DBA们常常聊话题。本文主要写Redis较常见的两种复制中断，以及导致反复无限次同步。
-
-Redis复制中断的影响Redis复制中断后，Slave会立即发起psync,psync尝试部署同步不成功">
+<meta name="twitter:description" content="很多常见数据库(含NoSQL)都用复制技术的多机结构，以实现数据冗余、高可用、数据备份和多地域读取等；如MySQL/MongoDB/Redis, 所以复制中断异常的Troubleshtooing和预案都是DBA们常常聊话题。本文主要写Redis较常见的两种复制中断，以及导致反复无限次同步。">
 
 
 
@@ -109,7 +103,7 @@ Redis复制中断的影响Redis复制中断后，Slave会立即发起psync,psync
   var NexT = window.NexT || {};
   var CONFIG = {
     scheme: 'Mist',
-    sidebar: {"position":"left","display":"post"},
+    sidebar: {"position":"left","display":"always"},
     fancybox: true,
     motion: true,
     duoshuo: {
@@ -327,6 +321,7 @@ Redis复制中断的影响Redis复制中断后，Slave会立即发起psync,psync
       
         <p>很多常见数据库(含NoSQL)都用复制技术的多机结构，以实现数据冗余、高可用、数据备份和多地域读取等；<br>如MySQL/MongoDB/Redis, 所以复制中断异常的Troubleshtooing和预案都是DBA们常常聊话题。<br>本文主要写Redis较常见的两种复制中断，以及导致反复无限次同步。</p>
 <hr>
+<a id="more"></a>
 <h2 id="Redis复制中断的影响"><a href="#Redis复制中断的影响" class="headerlink" title="Redis复制中断的影响"></a>Redis复制中断的影响</h2><p>Redis复制中断后，Slave会立即发起psync,psync尝试部署同步不成功，就会全量同步RDB；这样对分布式Redis集群影响较大。</p>
 <ul>
 <li>复制中断，Redis集群当前分片存在单点故障风险，此间Master故障，无可用slave进行failover，当前分片将不可用。</li>

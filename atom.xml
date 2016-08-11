@@ -5,7 +5,7 @@
   <link href="/atom.xml" rel="self"/>
   
   <link href="http://yoursite.com/"/>
-  <updated>2016-08-11T11:57:09.000Z</updated>
+  <updated>2016-08-11T12:12:44.000Z</updated>
   <id>http://yoursite.com/</id>
   
   <author>
@@ -20,10 +20,11 @@
     <link href="http://yoursite.com/2016/08/11/mysql-explain/"/>
     <id>http://yoursite.com/2016/08/11/mysql-explain/</id>
     <published>2016-08-11T11:18:00.000Z</published>
-    <updated>2016-08-11T11:57:09.000Z</updated>
+    <updated>2016-08-11T12:12:44.000Z</updated>
     
     <content type="html"><![CDATA[<p>在开发过程中，对每个上线的SQL查询指纹(query figerprint)的质量都应有估算；而估算DB查询质量最直接的方法，就是分析其查询执行计划( Query Execution Plan ,即QEP)。<br>MySQL数据库，通过Explain指令查看SELECT(5.6.3+版本开始支持update/delete/insert等)，下图为sakila.actor的表结构和一个主建过滤查询的执行计划。<br><img src="/images/explain/explain_1.png" alt="explain_1"><br>本文细说从以下三个方面:<br>    1.如何读取EXPLAIN的输出结果<br>    2.简介MySQL5.6的 EXPLAIN FORMAT = JSON和MySQL Workbench的Visual Explain<br>    3.简介MySQL的CBO和Optimizer Trace</p>
 <hr>
+<a id="more"></a>
 <h2 id="如何读取EXPLAIN的输出结果"><a href="#如何读取EXPLAIN的输出结果" class="headerlink" title="如何读取EXPLAIN的输出结果"></a>如何读取EXPLAIN的输出结果</h2><p>EXPLAIN的输出一般12个字段(其中partitions和filtered 5.5版本普通模式下没有），会对重要的字段内容进行分析说明<br><img src="/images/explain/explain_2.png" alt="explain_1"><br>本节详细分析，每个字段的含义和使用。</p>
 <h3 id="id字段"><a href="#id字段" class="headerlink" title="id字段"></a>id字段</h3><p>表示SELECT查询标识符，用于标识执行顺序，基本是数字；<br>执行顺序原则：id数据值大的优先执行,id值相同的从上往下顺序执行； 上图id值都为1，故SQ先执行actor表的查询</p>
 <h3 id="select-type字段"><a href="#select-type字段" class="headerlink" title="select_type字段"></a>select_type字段</h3><p>表示select子句的类型，常值有：<br>SIMPLE: 简单查询，查询子句不包含UNION或子查询<br>PRIMARY：最外层的SELECT子句<br>UNION: UNION子句右侧的SELECT子句<br>SUBQUERY: 子查询中第一个SELECT<br>DERIVED: 衍生表的SELECT子句</p>
@@ -58,7 +59,8 @@
     
     <summary type="html">
     
-      &lt;p&gt;在开发过程中，对每个上线的SQL查询指纹(query figerprint)的质量都应有估算；而估算DB查询质量最直接的方法，就是分析其查询执行计划( Query Execution Plan ,即QEP)。&lt;br&gt;MySQL数据库，通过Explain指令查看SELECT(
+      &lt;p&gt;在开发过程中，对每个上线的SQL查询指纹(query figerprint)的质量都应有估算；而估算DB查询质量最直接的方法，就是分析其查询执行计划( Query Execution Plan ,即QEP)。&lt;br&gt;MySQL数据库，通过Explain指令查看SELECT(5.6.3+版本开始支持update/delete/insert等)，下图为sakila.actor的表结构和一个主建过滤查询的执行计划。&lt;br&gt;&lt;img src=&quot;/images/explain/explain_1.png&quot; alt=&quot;explain_1&quot;&gt;&lt;br&gt;本文细说从以下三个方面:&lt;br&gt;    1.如何读取EXPLAIN的输出结果&lt;br&gt;    2.简介MySQL5.6的 EXPLAIN FORMAT = JSON和MySQL Workbench的Visual Explain&lt;br&gt;    3.简介MySQL的CBO和Optimizer Trace&lt;/p&gt;
+&lt;hr&gt;
     
     </summary>
     
@@ -74,10 +76,11 @@
     <link href="http://yoursite.com/2016/08/05/redis-useless-keys/"/>
     <id>http://yoursite.com/2016/08/05/redis-useless-keys/</id>
     <published>2016-08-05T12:15:33.000Z</published>
-    <updated>2016-08-09T13:04:22.000Z</updated>
+    <updated>2016-08-11T12:13:30.000Z</updated>
     
     <content type="html"><![CDATA[<p>大规模的数据库存储系统中，数据的生命周期管理是很有必要的；从业务角度发现过期数据，数据归档和数据碎片整理等。以MySQL为例，1个运行很久的TB级MySQL实例中，极有可能数百GB的数据，对业务来说是”过期数据”可直接归档后清理。如果不能发现和及时清理，这部分“过期数据”对生产数据库备份资源消耗，占用工作集数据内存(过期数据行可能分散InnoDB的page中)，影响数据还原的RTO等。从成本和运维的角度看，代价都是很大的。针对MySQL这类”过期数据”问题，通过MySQL巡检系统发现问题，使用MySQL归档系统备份和删除数据等。</p>
 <hr>
+<a id="more"></a>
 <h2 id="Redis死键的定义"><a href="#Redis死键的定义" class="headerlink" title="Redis死键的定义"></a>Redis死键的定义</h2><p> 本文简单聊下Redis”死键”的问题，从业务角度对”死键”的2个定义:</p>
 <ul>
 <li>设置有生存时间<a href="http://redis.io/commands/ttl" target="_blank" rel="external">Time to live:TTL</a>的键，已经过期”死亡”，但因Redis主动清理不及时，导致这类键堆积.(这里可能不清晰，后文会详解)</li>
@@ -151,7 +154,8 @@
     
     <summary type="html">
     
-      &lt;p&gt;大规模的数据库存储系统中，数据的生命周期管理是很有必要的；从业务角度发现过期数据，数据归档和数据碎片整理等。以MySQL为例，1个运行很久的TB级MySQL实例中，极有可能数百GB的数据，对业务来说是”过期数据”可直接归档后清理。如果不能发现和及时清理，这部分“过期数据”对
+      &lt;p&gt;大规模的数据库存储系统中，数据的生命周期管理是很有必要的；从业务角度发现过期数据，数据归档和数据碎片整理等。以MySQL为例，1个运行很久的TB级MySQL实例中，极有可能数百GB的数据，对业务来说是”过期数据”可直接归档后清理。如果不能发现和及时清理，这部分“过期数据”对生产数据库备份资源消耗，占用工作集数据内存(过期数据行可能分散InnoDB的page中)，影响数据还原的RTO等。从成本和运维的角度看，代价都是很大的。针对MySQL这类”过期数据”问题，通过MySQL巡检系统发现问题，使用MySQL归档系统备份和删除数据等。&lt;/p&gt;
+&lt;hr&gt;
     
     </summary>
     
@@ -167,10 +171,11 @@
     <link href="http://yoursite.com/2016/08/03/redis-cluster-imbalance/"/>
     <id>http://yoursite.com/2016/08/03/redis-cluster-imbalance/</id>
     <published>2016-08-03T15:50:00.000Z</published>
-    <updated>2016-08-09T12:52:26.000Z</updated>
+    <updated>2016-08-11T12:13:25.000Z</updated>
     
     <content type="html"><![CDATA[<p>对分布式存储系统的架构和运维管理，如何保证每个Node的数据存储容量和请求量尽量均衡，是非常重要的。<br>本文介绍Redis大集群运维过程中，常见导致数据和请求量“倾斜”的场景，及规避措施。</p>
 <hr>
+<a id="more"></a>
 <h2 id="Redis数据容量或请求量严重”倾斜”的影响"><a href="#Redis数据容量或请求量严重”倾斜”的影响" class="headerlink" title="Redis数据容量或请求量严重”倾斜”的影响"></a>Redis数据容量或请求量严重”倾斜”的影响</h2><p>以下从运维的角度解释，Redis数十节点的集群，出现数据容量和请求量倾斜情况下，存在的一些痛点:</p>
 <ul>
 <li>少数或单个节点请求量”过热”，导致Redis分布式系统失去可扩展性能力和集群的意义。类似MongoDB_id字段作为片键。</li>
@@ -209,7 +214,6 @@
     
       &lt;p&gt;对分布式存储系统的架构和运维管理，如何保证每个Node的数据存储容量和请求量尽量均衡，是非常重要的。&lt;br&gt;本文介绍Redis大集群运维过程中，常见导致数据和请求量“倾斜”的场景，及规避措施。&lt;/p&gt;
 &lt;hr&gt;
-&lt;h2 id=&quot;Redis数据容量或请求量严重”倾斜”的影响&quot;
     
     </summary>
     
@@ -225,10 +229,11 @@
     <link href="http://yoursite.com/2016/07/31/redis-replication-broken-and-loopsync/"/>
     <id>http://yoursite.com/2016/07/31/redis-replication-broken-and-loopsync/</id>
     <published>2016-07-31T10:33:33.000Z</published>
-    <updated>2016-08-09T12:40:50.000Z</updated>
+    <updated>2016-08-11T12:12:50.000Z</updated>
     
     <content type="html"><![CDATA[<p>很多常见数据库(含NoSQL)都用复制技术的多机结构，以实现数据冗余、高可用、数据备份和多地域读取等；<br>如MySQL/MongoDB/Redis, 所以复制中断异常的Troubleshtooing和预案都是DBA们常常聊话题。<br>本文主要写Redis较常见的两种复制中断，以及导致反复无限次同步。</p>
 <hr>
+<a id="more"></a>
 <h2 id="Redis复制中断的影响"><a href="#Redis复制中断的影响" class="headerlink" title="Redis复制中断的影响"></a>Redis复制中断的影响</h2><p>Redis复制中断后，Slave会立即发起psync,psync尝试部署同步不成功，就会全量同步RDB；这样对分布式Redis集群影响较大。</p>
 <ul>
 <li>复制中断，Redis集群当前分片存在单点故障风险，此间Master故障，无可用slave进行failover，当前分片将不可用。</li>
@@ -345,7 +350,8 @@
     
     <summary type="html">
     
-      &lt;p&gt;很多常见数据库(含NoSQL)都用复制技术的多机结构，以实现数据冗余、高可用、数据备份和多地域读取等；&lt;br&gt;如MySQL/MongoDB/Redis, 所以复制中断异常的Troubleshtooing和预案都是DBA们常常聊话题。&lt;br&gt;本文主要写Redis较常见的两种复
+      &lt;p&gt;很多常见数据库(含NoSQL)都用复制技术的多机结构，以实现数据冗余、高可用、数据备份和多地域读取等；&lt;br&gt;如MySQL/MongoDB/Redis, 所以复制中断异常的Troubleshtooing和预案都是DBA们常常聊话题。&lt;br&gt;本文主要写Redis较常见的两种复制中断，以及导致反复无限次同步。&lt;/p&gt;
+&lt;hr&gt;
     
     </summary>
     
@@ -361,10 +367,11 @@
     <link href="http://yoursite.com/2016/07/30/redis-client-two-buffers/"/>
     <id>http://yoursite.com/2016/07/30/redis-client-two-buffers/</id>
     <published>2016-07-30T08:29:33.000Z</published>
-    <updated>2016-08-11T11:58:44.000Z</updated>
+    <updated>2016-08-11T12:13:15.000Z</updated>
     
     <content type="html"><![CDATA[<p>每个Redis客户端（以下简称”Client”)都有多个状态属性，而理解和分析这些属性，对于我们设计Redis键空间和运营管理都有帮助。<br>本文将详细分析Client的两个重要属性：Query buffer（输入缓冲区）、Output buffers（输出缓冲区）</p>
 <hr>
+<a id="more"></a>
 <h2 id="Redis-Client属性一览"><a href="#Redis-Client属性一览" class="headerlink" title="Redis Client属性一览"></a>Redis Client属性一览</h2><p>  使用<a href="http://redis.io/commands/client-list" target="_blank" rel="external">redis client</a>命令可查看当前Redis实例的所有客户端；每行数据对应一个客户端。<br>  <figure class="highlight plain"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div></pre></td><td class="code"><pre><div class="line">127.0.0.1:6390&gt; client list</div><div class="line">id=2 addr=127.0.0.1:53184 fd=8 name= age=33 idle=24 flags=N db=0 sub=0 psub=0 multi=-1 qbuf=0 qbuf-free=0 obl=0 oll=0 omem=0 events=r cmd=client</div><div class="line">id=3 addr=127.0.0.1:53190 fd=7 name= age=2 idle=0 flags=N db=0 sub=0 psub=0 multi=-1 qbuf=0 qbuf-free=32768 obl=0 oll=0 omem=0 events=r cmd=client</div></pre></td></tr></table></figure></p>
 <p>以上为两个客户端，每个包含18个字段属性；其中属性的基本含义此处简单说明，后文会对重启指标深入分析。<br><figure class="highlight plain"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div></pre></td><td class="code"><pre><div class="line">id：客户端唯一标识, 每新创建一个连接就自增1；redis重启后重置1。</div><div class="line">addr: 客户端源ip:port;用于分析异常的客户端，定位是由哪个服务器哪个进程引起的； 如id=2的客户端 netstat -anp | grep 53184</div><div class="line">fd: socket的文件描述符；数值同lsof的FD字段相同</div><div class="line">name: 客户端的名字，默认不会设置，一般用处不大。可手动执行[clientsetname](http://redis.io/commands/client-setname)</div><div class="line">age: 客户端存活的秒数</div><div class="line">idle: 空闲的秒数；用于回收客户端和分析大量连接时有用</div><div class="line">flages:客户端类型的标志, 共13种，常用的几种：N(普通客户端),M(master),S(slave),O(执行monitor)</div><div class="line">db:客户端当前使用的database序号</div><div class="line">sub/psub: 快订阅的频道/模式数</div><div class="line">multi:当前事务中已执行命令个数</div><div class="line">qbuf: query buffer的字节数         重要</div><div class="line">qbuf-free: query buffer的剩余字节数</div><div class="line">obl:定长Output buffer的使用字节数</div><div class="line">oll:可变大小output buffer的对象个数</div><div class="line">omem:可变大小output buffer的内存使用字节数  重要</div><div class="line">events: 文件描述符事作件(r/w)</div><div class="line">cmd:客户端最近一次执行的命令，不包含参数</div></pre></td></tr></table></figure></p>
 <h2 id="Redis-Client-Query-Buffer"><a href="#Redis-Client-Query-Buffer" class="headerlink" title="Redis Client Query Buffer"></a>Redis Client Query Buffer</h2><p>每个Client都有一个query buffer(查询缓存区或输入缓存区), 它用于保存客户端的发送命令，redis server从query buffer获取命令并执行。</p>
@@ -419,7 +426,8 @@
     
     <summary type="html">
     
-      &lt;p&gt;每个Redis客户端（以下简称”Client”)都有多个状态属性，而理解和分析这些属性，对于我们设计Redis键空间和运营管理都有帮助。&lt;br&gt;本文将详细分析Client的两个重要属性：Query buffer（输入缓冲区）、Output buffers（输出缓冲区）&lt;/p
+      &lt;p&gt;每个Redis客户端（以下简称”Client”)都有多个状态属性，而理解和分析这些属性，对于我们设计Redis键空间和运营管理都有帮助。&lt;br&gt;本文将详细分析Client的两个重要属性：Query buffer（输入缓冲区）、Output buffers（输出缓冲区）&lt;/p&gt;
+&lt;hr&gt;
     
     </summary>
     
@@ -435,10 +443,11 @@
     <link href="http://yoursite.com/2016/07/29/redis-sec/"/>
     <id>http://yoursite.com/2016/07/29/redis-sec/</id>
     <published>2016-07-29T05:15:33.000Z</published>
-    <updated>2016-08-09T13:13:33.000Z</updated>
+    <updated>2016-08-11T12:13:34.000Z</updated>
     
     <content type="html"><![CDATA[<p>去年11月初Redis爆出安全漏洞，远程连接redis在满足一定条件下，可控制redis服务器root权限。最近又有小伙伴中招； 本文介绍这个漏洞的细节和Redis的基本安全规范。</p>
 <hr>
+<a id="more"></a>
 <h2 id="Redis漏洞背景"><a href="#Redis漏洞背景" class="headerlink" title="Redis漏洞背景"></a>Redis漏洞背景</h2><p>去年11月antirez（redis’s father）在他博客<a href="http://antirez.com/news/96" target="_blank" rel="external">A few things about Redis security</a>一文详细说明这个问题。暴露的公网(或无访问控制)的redis实例，如果是无或弱密码设置，并且未对config,flushall,[bg]save命令未rename。可以被攻击者通过写redis RDB文件的方式来写SSH公钥，然后可以登陆redis服务器，获得root权限。</p>
 <h2 id="利用漏洞获取root过程模拟"><a href="#利用漏洞获取root过程模拟" class="headerlink" title="利用漏洞获取root过程模拟"></a>利用漏洞获取root过程模拟</h2><p>场景：攻击者所在sec-client外部服务器，探测到有公网的sec-redis.bj服务器，有一个无密码设置6379的redis实例。攻击者通过连接redis实例，最后获取redis服务器的root权限。<br>现在攻击者在client服务器不能登陆redis服务器。<br><figure class="highlight plain"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div></pre></td><td class="code"><pre><div class="line">[zhuo@sec-client ~]$ ssh root@sec-redis.bj</div><div class="line">root@sec-redis.bj&apos;s password:</div><div class="line">Permission denied, please try again.</div></pre></td></tr></table></figure></p>
 <h3 id="client服务器，生成公钥"><a href="#client服务器，生成公钥" class="headerlink" title="client服务器，生成公钥"></a>client服务器，生成公钥</h3><figure class="highlight plain"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div><div class="line">20</div><div class="line">21</div></pre></td><td class="code"><pre><div class="line">[zhuo@sec-client ~]$ ssh-keygen -t rsa</div><div class="line">Generating public/private rsa key pair.</div><div class="line">Enter file in which to save the key (/home/zhuo/.ssh/id_rsa):</div><div class="line">Enter passphrase (empty for no passphrase):</div><div class="line">Enter same passphrase again:</div><div class="line">Your identification has been saved in /home/zhuo/.ssh/id_rsa.</div><div class="line">Your public key has been saved in /home/zhuo/.ssh/id_rsa.pub.</div><div class="line">The key fingerprint is:</div><div class="line">ef:b9:f5:34:a6:f4:62:fc:19:f6:46:17:ac:45:3e:72 zhuo@sec-client.bj</div><div class="line">The key&apos;s randomart image is:</div><div class="line">+--[ RSA 2048]----+</div><div class="line">|                 |</div><div class="line">|               . |</div><div class="line">|              +  |</div><div class="line">|             . E |</div><div class="line">|        S     = o|</div><div class="line">|         .   .  o|</div><div class="line">|          ..o *..|</div><div class="line">|         . ++B =.|</div><div class="line">|          +o.o=..|</div><div class="line">+-----------------+</div></pre></td></tr></table></figure>
@@ -476,7 +485,6 @@
     
       &lt;p&gt;去年11月初Redis爆出安全漏洞，远程连接redis在满足一定条件下，可控制redis服务器root权限。最近又有小伙伴中招； 本文介绍这个漏洞的细节和Redis的基本安全规范。&lt;/p&gt;
 &lt;hr&gt;
-&lt;h2 id=&quot;Redis漏洞背景&quot;&gt;&lt;a href=&quot;#Redis漏洞背
     
     </summary>
     

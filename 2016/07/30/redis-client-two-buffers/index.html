@@ -86,22 +86,16 @@
 
 
 
-<meta name="description" content="每个Redis客户端（以下简称”Client”)都有多个状态属性，而理解和分析这些属性，对于我们设计Redis键空间和运营管理都有帮助。本文将详细分析Client的两个重要属性：Query buffer（输入缓冲区）、Output buffers（输出缓冲区）
-
-Redis Client属性一览  使用redis client命令可查看当前Redis实例的所有客户端；每行数据对应一个客户端。  1">
+<meta name="description" content="每个Redis客户端（以下简称”Client”)都有多个状态属性，而理解和分析这些属性，对于我们设计Redis键空间和运营管理都有帮助。本文将详细分析Client的两个重要属性：Query buffer（输入缓冲区）、Output buffers（输出缓冲区）">
 <meta property="og:type" content="article">
 <meta property="og:title" content="Redis Client query buffer and output buffer">
 <meta property="og:url" content="http://yoursite.com/2016/07/30/redis-client-two-buffers/index.html">
 <meta property="og:site_name" content="今天">
-<meta property="og:description" content="每个Redis客户端（以下简称”Client”)都有多个状态属性，而理解和分析这些属性，对于我们设计Redis键空间和运营管理都有帮助。本文将详细分析Client的两个重要属性：Query buffer（输入缓冲区）、Output buffers（输出缓冲区）
-
-Redis Client属性一览  使用redis client命令可查看当前Redis实例的所有客户端；每行数据对应一个客户端。  1">
-<meta property="og:updated_time" content="2016-08-11T11:58:44.000Z">
+<meta property="og:description" content="每个Redis客户端（以下简称”Client”)都有多个状态属性，而理解和分析这些属性，对于我们设计Redis键空间和运营管理都有帮助。本文将详细分析Client的两个重要属性：Query buffer（输入缓冲区）、Output buffers（输出缓冲区）">
+<meta property="og:updated_time" content="2016-08-11T12:13:15.000Z">
 <meta name="twitter:card" content="summary">
 <meta name="twitter:title" content="Redis Client query buffer and output buffer">
-<meta name="twitter:description" content="每个Redis客户端（以下简称”Client”)都有多个状态属性，而理解和分析这些属性，对于我们设计Redis键空间和运营管理都有帮助。本文将详细分析Client的两个重要属性：Query buffer（输入缓冲区）、Output buffers（输出缓冲区）
-
-Redis Client属性一览  使用redis client命令可查看当前Redis实例的所有客户端；每行数据对应一个客户端。  1">
+<meta name="twitter:description" content="每个Redis客户端（以下简称”Client”)都有多个状态属性，而理解和分析这些属性，对于我们设计Redis键空间和运营管理都有帮助。本文将详细分析Client的两个重要属性：Query buffer（输入缓冲区）、Output buffers（输出缓冲区）">
 
 
 
@@ -109,7 +103,7 @@ Redis Client属性一览  使用redis client命令可查看当前Redis实例的�
   var NexT = window.NexT || {};
   var CONFIG = {
     scheme: 'Mist',
-    sidebar: {"position":"left","display":"post"},
+    sidebar: {"position":"left","display":"always"},
     fancybox: true,
     motion: true,
     duoshuo: {
@@ -327,6 +321,7 @@ Redis Client属性一览  使用redis client命令可查看当前Redis实例的�
       
         <p>每个Redis客户端（以下简称”Client”)都有多个状态属性，而理解和分析这些属性，对于我们设计Redis键空间和运营管理都有帮助。<br>本文将详细分析Client的两个重要属性：Query buffer（输入缓冲区）、Output buffers（输出缓冲区）</p>
 <hr>
+<a id="more"></a>
 <h2 id="Redis-Client属性一览"><a href="#Redis-Client属性一览" class="headerlink" title="Redis Client属性一览"></a>Redis Client属性一览</h2><p>  使用<a href="http://redis.io/commands/client-list" target="_blank" rel="external">redis client</a>命令可查看当前Redis实例的所有客户端；每行数据对应一个客户端。<br>  <figure class="highlight plain"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div></pre></td><td class="code"><pre><div class="line">127.0.0.1:6390&gt; client list</div><div class="line">id=2 addr=127.0.0.1:53184 fd=8 name= age=33 idle=24 flags=N db=0 sub=0 psub=0 multi=-1 qbuf=0 qbuf-free=0 obl=0 oll=0 omem=0 events=r cmd=client</div><div class="line">id=3 addr=127.0.0.1:53190 fd=7 name= age=2 idle=0 flags=N db=0 sub=0 psub=0 multi=-1 qbuf=0 qbuf-free=32768 obl=0 oll=0 omem=0 events=r cmd=client</div></pre></td></tr></table></figure></p>
 <p>以上为两个客户端，每个包含18个字段属性；其中属性的基本含义此处简单说明，后文会对重启指标深入分析。<br><figure class="highlight plain"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div></pre></td><td class="code"><pre><div class="line">id：客户端唯一标识, 每新创建一个连接就自增1；redis重启后重置1。</div><div class="line">addr: 客户端源ip:port;用于分析异常的客户端，定位是由哪个服务器哪个进程引起的； 如id=2的客户端 netstat -anp | grep 53184</div><div class="line">fd: socket的文件描述符；数值同lsof的FD字段相同</div><div class="line">name: 客户端的名字，默认不会设置，一般用处不大。可手动执行[clientsetname](http://redis.io/commands/client-setname)</div><div class="line">age: 客户端存活的秒数</div><div class="line">idle: 空闲的秒数；用于回收客户端和分析大量连接时有用</div><div class="line">flages:客户端类型的标志, 共13种，常用的几种：N(普通客户端),M(master),S(slave),O(执行monitor)</div><div class="line">db:客户端当前使用的database序号</div><div class="line">sub/psub: 快订阅的频道/模式数</div><div class="line">multi:当前事务中已执行命令个数</div><div class="line">qbuf: query buffer的字节数         重要</div><div class="line">qbuf-free: query buffer的剩余字节数</div><div class="line">obl:定长Output buffer的使用字节数</div><div class="line">oll:可变大小output buffer的对象个数</div><div class="line">omem:可变大小output buffer的内存使用字节数  重要</div><div class="line">events: 文件描述符事作件(r/w)</div><div class="line">cmd:客户端最近一次执行的命令，不包含参数</div></pre></td></tr></table></figure></p>
 <h2 id="Redis-Client-Query-Buffer"><a href="#Redis-Client-Query-Buffer" class="headerlink" title="Redis Client Query Buffer"></a>Redis Client Query Buffer</h2><p>每个Client都有一个query buffer(查询缓存区或输入缓存区), 它用于保存客户端的发送命令，redis server从query buffer获取命令并执行。</p>

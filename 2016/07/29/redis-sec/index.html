@@ -86,22 +86,16 @@
 
 
 
-<meta name="description" content="去年11月初Redis爆出安全漏洞，远程连接redis在满足一定条件下，可控制redis服务器root权限。最近又有小伙伴中招； 本文介绍这个漏洞的细节和Redis的基本安全规范。
-
-Redis漏洞背景去年11月antirez（redis’s father）在他博客A few things about Redis security一文详细说明这个问题。暴露的公网(或无访问控制)的redis实例，如">
+<meta name="description" content="去年11月初Redis爆出安全漏洞，远程连接redis在满足一定条件下，可控制redis服务器root权限。最近又有小伙伴中招； 本文介绍这个漏洞的细节和Redis的基本安全规范。">
 <meta property="og:type" content="article">
 <meta property="og:title" content="记一个Redis安全漏洞和Redis安全规范">
 <meta property="og:url" content="http://yoursite.com/2016/07/29/redis-sec/index.html">
 <meta property="og:site_name" content="今天">
-<meta property="og:description" content="去年11月初Redis爆出安全漏洞，远程连接redis在满足一定条件下，可控制redis服务器root权限。最近又有小伙伴中招； 本文介绍这个漏洞的细节和Redis的基本安全规范。
-
-Redis漏洞背景去年11月antirez（redis’s father）在他博客A few things about Redis security一文详细说明这个问题。暴露的公网(或无访问控制)的redis实例，如">
-<meta property="og:updated_time" content="2016-08-09T13:13:33.000Z">
+<meta property="og:description" content="去年11月初Redis爆出安全漏洞，远程连接redis在满足一定条件下，可控制redis服务器root权限。最近又有小伙伴中招； 本文介绍这个漏洞的细节和Redis的基本安全规范。">
+<meta property="og:updated_time" content="2016-08-11T12:13:34.000Z">
 <meta name="twitter:card" content="summary">
 <meta name="twitter:title" content="记一个Redis安全漏洞和Redis安全规范">
-<meta name="twitter:description" content="去年11月初Redis爆出安全漏洞，远程连接redis在满足一定条件下，可控制redis服务器root权限。最近又有小伙伴中招； 本文介绍这个漏洞的细节和Redis的基本安全规范。
-
-Redis漏洞背景去年11月antirez（redis’s father）在他博客A few things about Redis security一文详细说明这个问题。暴露的公网(或无访问控制)的redis实例，如">
+<meta name="twitter:description" content="去年11月初Redis爆出安全漏洞，远程连接redis在满足一定条件下，可控制redis服务器root权限。最近又有小伙伴中招； 本文介绍这个漏洞的细节和Redis的基本安全规范。">
 
 
 
@@ -109,7 +103,7 @@ Redis漏洞背景去年11月antirez（redis’s father）在他博客A few thing
   var NexT = window.NexT || {};
   var CONFIG = {
     scheme: 'Mist',
-    sidebar: {"position":"left","display":"post"},
+    sidebar: {"position":"left","display":"always"},
     fancybox: true,
     motion: true,
     duoshuo: {
@@ -327,6 +321,7 @@ Redis漏洞背景去年11月antirez（redis’s father）在他博客A few thing
       
         <p>去年11月初Redis爆出安全漏洞，远程连接redis在满足一定条件下，可控制redis服务器root权限。最近又有小伙伴中招； 本文介绍这个漏洞的细节和Redis的基本安全规范。</p>
 <hr>
+<a id="more"></a>
 <h2 id="Redis漏洞背景"><a href="#Redis漏洞背景" class="headerlink" title="Redis漏洞背景"></a>Redis漏洞背景</h2><p>去年11月antirez（redis’s father）在他博客<a href="http://antirez.com/news/96" target="_blank" rel="external">A few things about Redis security</a>一文详细说明这个问题。暴露的公网(或无访问控制)的redis实例，如果是无或弱密码设置，并且未对config,flushall,[bg]save命令未rename。可以被攻击者通过写redis RDB文件的方式来写SSH公钥，然后可以登陆redis服务器，获得root权限。</p>
 <h2 id="利用漏洞获取root过程模拟"><a href="#利用漏洞获取root过程模拟" class="headerlink" title="利用漏洞获取root过程模拟"></a>利用漏洞获取root过程模拟</h2><p>场景：攻击者所在sec-client外部服务器，探测到有公网的sec-redis.bj服务器，有一个无密码设置6379的redis实例。攻击者通过连接redis实例，最后获取redis服务器的root权限。<br>现在攻击者在client服务器不能登陆redis服务器。<br><figure class="highlight plain"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div></pre></td><td class="code"><pre><div class="line">[zhuo@sec-client ~]$ ssh root@sec-redis.bj</div><div class="line">root@sec-redis.bj&apos;s password:</div><div class="line">Permission denied, please try again.</div></pre></td></tr></table></figure></p>
 <h3 id="client服务器，生成公钥"><a href="#client服务器，生成公钥" class="headerlink" title="client服务器，生成公钥"></a>client服务器，生成公钥</h3><figure class="highlight plain"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div><div class="line">20</div><div class="line">21</div></pre></td><td class="code"><pre><div class="line">[zhuo@sec-client ~]$ ssh-keygen -t rsa</div><div class="line">Generating public/private rsa key pair.</div><div class="line">Enter file in which to save the key (/home/zhuo/.ssh/id_rsa):</div><div class="line">Enter passphrase (empty for no passphrase):</div><div class="line">Enter same passphrase again:</div><div class="line">Your identification has been saved in /home/zhuo/.ssh/id_rsa.</div><div class="line">Your public key has been saved in /home/zhuo/.ssh/id_rsa.pub.</div><div class="line">The key fingerprint is:</div><div class="line">ef:b9:f5:34:a6:f4:62:fc:19:f6:46:17:ac:45:3e:72 zhuo@sec-client.bj</div><div class="line">The key&apos;s randomart image is:</div><div class="line">+--[ RSA 2048]----+</div><div class="line">|                 |</div><div class="line">|               . |</div><div class="line">|              +  |</div><div class="line">|             . E |</div><div class="line">|        S     = o|</div><div class="line">|         .   .  o|</div><div class="line">|          ..o *..|</div><div class="line">|         . ++B =.|</div><div class="line">|          +o.o=..|</div><div class="line">+-----------------+</div></pre></td></tr></table></figure>

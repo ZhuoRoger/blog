@@ -86,28 +86,16 @@
 
 
 
-<meta name="description" content="对分布式存储系统的架构和运维管理，如何保证每个Node的数据存储容量和请求量尽量均衡，是非常重要的。本文介绍Redis大集群运维过程中，常见导致数据和请求量“倾斜”的场景，及规避措施。
-
-Redis数据容量或请求量严重”倾斜”的影响以下从运维的角度解释，Redis数十节点的集群，出现数据容量和请求量倾斜情况下，存在的一些痛点:
-
-少数或单个节点请求量”过热”，导致Redis分布式系统失去可扩展性能">
+<meta name="description" content="对分布式存储系统的架构和运维管理，如何保证每个Node的数据存储容量和请求量尽量均衡，是非常重要的。本文介绍Redis大集群运维过程中，常见导致数据和请求量“倾斜”的场景，及规避措施。">
 <meta property="og:type" content="article">
 <meta property="og:title" content="Redis Cluster Imbalance">
 <meta property="og:url" content="http://yoursite.com/2016/08/03/redis-cluster-imbalance/index.html">
 <meta property="og:site_name" content="今天">
-<meta property="og:description" content="对分布式存储系统的架构和运维管理，如何保证每个Node的数据存储容量和请求量尽量均衡，是非常重要的。本文介绍Redis大集群运维过程中，常见导致数据和请求量“倾斜”的场景，及规避措施。
-
-Redis数据容量或请求量严重”倾斜”的影响以下从运维的角度解释，Redis数十节点的集群，出现数据容量和请求量倾斜情况下，存在的一些痛点:
-
-少数或单个节点请求量”过热”，导致Redis分布式系统失去可扩展性能">
-<meta property="og:updated_time" content="2016-08-09T12:52:26.000Z">
+<meta property="og:description" content="对分布式存储系统的架构和运维管理，如何保证每个Node的数据存储容量和请求量尽量均衡，是非常重要的。本文介绍Redis大集群运维过程中，常见导致数据和请求量“倾斜”的场景，及规避措施。">
+<meta property="og:updated_time" content="2016-08-11T12:13:25.000Z">
 <meta name="twitter:card" content="summary">
 <meta name="twitter:title" content="Redis Cluster Imbalance">
-<meta name="twitter:description" content="对分布式存储系统的架构和运维管理，如何保证每个Node的数据存储容量和请求量尽量均衡，是非常重要的。本文介绍Redis大集群运维过程中，常见导致数据和请求量“倾斜”的场景，及规避措施。
-
-Redis数据容量或请求量严重”倾斜”的影响以下从运维的角度解释，Redis数十节点的集群，出现数据容量和请求量倾斜情况下，存在的一些痛点:
-
-少数或单个节点请求量”过热”，导致Redis分布式系统失去可扩展性能">
+<meta name="twitter:description" content="对分布式存储系统的架构和运维管理，如何保证每个Node的数据存储容量和请求量尽量均衡，是非常重要的。本文介绍Redis大集群运维过程中，常见导致数据和请求量“倾斜”的场景，及规避措施。">
 
 
 
@@ -115,7 +103,7 @@ Redis数据容量或请求量严重”倾斜”的影响以下从运维的角度
   var NexT = window.NexT || {};
   var CONFIG = {
     scheme: 'Mist',
-    sidebar: {"position":"left","display":"post"},
+    sidebar: {"position":"left","display":"always"},
     fancybox: true,
     motion: true,
     duoshuo: {
@@ -333,6 +321,7 @@ Redis数据容量或请求量严重”倾斜”的影响以下从运维的角度
       
         <p>对分布式存储系统的架构和运维管理，如何保证每个Node的数据存储容量和请求量尽量均衡，是非常重要的。<br>本文介绍Redis大集群运维过程中，常见导致数据和请求量“倾斜”的场景，及规避措施。</p>
 <hr>
+<a id="more"></a>
 <h2 id="Redis数据容量或请求量严重”倾斜”的影响"><a href="#Redis数据容量或请求量严重”倾斜”的影响" class="headerlink" title="Redis数据容量或请求量严重”倾斜”的影响"></a>Redis数据容量或请求量严重”倾斜”的影响</h2><p>以下从运维的角度解释，Redis数十节点的集群，出现数据容量和请求量倾斜情况下，存在的一些痛点:</p>
 <ul>
 <li>少数或单个节点请求量”过热”，导致Redis分布式系统失去可扩展性能力和集群的意义。类似MongoDB_id字段作为片键。</li>

@@ -103,7 +103,7 @@
 <meta property="og:image" content="http://yoursite.com/images/explain/explain_json.png">
 <meta property="og:image" content="http://yoursite.com/images/explain/explain_v2.png">
 <meta property="og:image" content="http://yoursite.com/images/explain/trace.png">
-<meta property="og:updated_time" content="2016-08-11T11:57:09.000Z">
+<meta property="og:updated_time" content="2016-08-11T12:12:44.000Z">
 <meta name="twitter:card" content="summary">
 <meta name="twitter:title" content="细说MySQL Explain和Optimizer Trace简介">
 <meta name="twitter:description" content="在开发过程中，对每个上线的SQL查询指纹(query figerprint)的质量都应有估算；而估算DB查询质量最直接的方法，就是分析其查询执行计划( Query Execution Plan ,即QEP)。MySQL数据库，通过Explain指令查看SELECT(5.6.3+版本开始支持update/delete/insert等)，下图为sakila.actor的表结构和一个主建过滤查询的执行计">
@@ -115,7 +115,7 @@
   var NexT = window.NexT || {};
   var CONFIG = {
     scheme: 'Mist',
-    sidebar: {"position":"left","display":"post"},
+    sidebar: {"position":"left","display":"always"},
     fancybox: true,
     motion: true,
     duoshuo: {
@@ -333,6 +333,7 @@
       
         <p>在开发过程中，对每个上线的SQL查询指纹(query figerprint)的质量都应有估算；而估算DB查询质量最直接的方法，就是分析其查询执行计划( Query Execution Plan ,即QEP)。<br>MySQL数据库，通过Explain指令查看SELECT(5.6.3+版本开始支持update/delete/insert等)，下图为sakila.actor的表结构和一个主建过滤查询的执行计划。<br><img src="/images/explain/explain_1.png" alt="explain_1"><br>本文细说从以下三个方面:<br>    1.如何读取EXPLAIN的输出结果<br>    2.简介MySQL5.6的 EXPLAIN FORMAT = JSON和MySQL Workbench的Visual Explain<br>    3.简介MySQL的CBO和Optimizer Trace</p>
 <hr>
+<a id="more"></a>
 <h2 id="如何读取EXPLAIN的输出结果"><a href="#如何读取EXPLAIN的输出结果" class="headerlink" title="如何读取EXPLAIN的输出结果"></a>如何读取EXPLAIN的输出结果</h2><p>EXPLAIN的输出一般12个字段(其中partitions和filtered 5.5版本普通模式下没有），会对重要的字段内容进行分析说明<br><img src="/images/explain/explain_2.png" alt="explain_1"><br>本节详细分析，每个字段的含义和使用。</p>
 <h3 id="id字段"><a href="#id字段" class="headerlink" title="id字段"></a>id字段</h3><p>表示SELECT查询标识符，用于标识执行顺序，基本是数字；<br>执行顺序原则：id数据值大的优先执行,id值相同的从上往下顺序执行； 上图id值都为1，故SQ先执行actor表的查询</p>
 <h3 id="select-type字段"><a href="#select-type字段" class="headerlink" title="select_type字段"></a>select_type字段</h3><p>表示select子句的类型，常值有：<br>SIMPLE: 简单查询，查询子句不包含UNION或子查询<br>PRIMARY：最外层的SELECT子句<br>UNION: UNION子句右侧的SELECT子句<br>SUBQUERY: 子查询中第一个SELECT<br>DERIVED: 衍生表的SELECT子句</p>

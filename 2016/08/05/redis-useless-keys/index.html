@@ -92,7 +92,7 @@
 <meta property="og:url" content="http://yoursite.com/2016/08/05/redis-useless-keys/index.html">
 <meta property="og:site_name" content="今天">
 <meta property="og:description" content="大规模的数据库存储系统中，数据的生命周期管理是很有必要的；从业务角度发现过期数据，数据归档和数据碎片整理等。以MySQL为例，1个运行很久的TB级MySQL实例中，极有可能数百GB的数据，对业务来说是”过期数据”可直接归档后清理。如果不能发现和及时清理，这部分“过期数据”对生产数据库备份资源消耗，占用工作集数据内存(过期数据行可能分散InnoDB的page中)，影响数据还原的RTO等。从成本和运维">
-<meta property="og:updated_time" content="2016-08-09T13:04:22.000Z">
+<meta property="og:updated_time" content="2016-08-11T12:13:30.000Z">
 <meta name="twitter:card" content="summary">
 <meta name="twitter:title" content="Redis的“死键”问题">
 <meta name="twitter:description" content="大规模的数据库存储系统中，数据的生命周期管理是很有必要的；从业务角度发现过期数据，数据归档和数据碎片整理等。以MySQL为例，1个运行很久的TB级MySQL实例中，极有可能数百GB的数据，对业务来说是”过期数据”可直接归档后清理。如果不能发现和及时清理，这部分“过期数据”对生产数据库备份资源消耗，占用工作集数据内存(过期数据行可能分散InnoDB的page中)，影响数据还原的RTO等。从成本和运维">
@@ -103,7 +103,7 @@
   var NexT = window.NexT || {};
   var CONFIG = {
     scheme: 'Mist',
-    sidebar: {"position":"left","display":"post"},
+    sidebar: {"position":"left","display":"always"},
     fancybox: true,
     motion: true,
     duoshuo: {
@@ -321,6 +321,7 @@
       
         <p>大规模的数据库存储系统中，数据的生命周期管理是很有必要的；从业务角度发现过期数据，数据归档和数据碎片整理等。以MySQL为例，1个运行很久的TB级MySQL实例中，极有可能数百GB的数据，对业务来说是”过期数据”可直接归档后清理。如果不能发现和及时清理，这部分“过期数据”对生产数据库备份资源消耗，占用工作集数据内存(过期数据行可能分散InnoDB的page中)，影响数据还原的RTO等。从成本和运维的角度看，代价都是很大的。针对MySQL这类”过期数据”问题，通过MySQL巡检系统发现问题，使用MySQL归档系统备份和删除数据等。</p>
 <hr>
+<a id="more"></a>
 <h2 id="Redis死键的定义"><a href="#Redis死键的定义" class="headerlink" title="Redis死键的定义"></a>Redis死键的定义</h2><p> 本文简单聊下Redis”死键”的问题，从业务角度对”死键”的2个定义:</p>
 <ul>
 <li>设置有生存时间<a href="http://redis.io/commands/ttl" target="_blank" rel="external">Time to live:TTL</a>的键，已经过期”死亡”，但因Redis主动清理不及时，导致这类键堆积.(这里可能不清晰，后文会详解)</li>
