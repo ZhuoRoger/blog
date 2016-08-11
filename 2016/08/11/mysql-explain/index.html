@@ -1,0 +1,753 @@
+<!doctype html>
+
+
+
+  
+
+
+<html class="theme-next mist use-motion">
+<head>
+  <meta charset="UTF-8"/>
+<meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1"/>
+
+
+
+<meta http-equiv="Cache-Control" content="no-transform" />
+<meta http-equiv="Cache-Control" content="no-siteapp" />
+
+
+
+
+
+
+
+
+
+
+
+
+  
+  
+  <link href="/vendors/fancybox/source/jquery.fancybox.css?v=2.1.5" rel="stylesheet" type="text/css" />
+
+
+
+
+  
+  
+  
+  
+
+  
+    
+    
+  
+
+  
+
+  
+
+  
+
+  
+
+  
+    
+    
+    <link href="//fonts.googleapis.com/css?family=Lato:300,300italic,400,400italic,700,700italic&subset=latin,latin-ext" rel="stylesheet" type="text/css">
+  
+
+
+
+
+
+
+<link href="/vendors/font-awesome/css/font-awesome.min.css?v=4.4.0" rel="stylesheet" type="text/css" />
+
+<link href="/css/main.css?v=5.0.1" rel="stylesheet" type="text/css" />
+
+
+  <meta name="keywords" content="MySQL," />
+
+
+
+
+
+  <link rel="alternate" href="/atom.xml" title="今天" type="application/atom+xml" />
+
+
+
+
+  <link rel="shortcut icon" type="image/x-icon" href="/favicon.ico?v=5.0.1" />
+
+
+
+
+
+
+<meta name="description" content="在开发过程中，对每个上线的SQL查询指纹(query figerprint)的质量都应有估算；而估算DB查询质量最直接的方法，就是分析其查询执行计划( Query Execution Plan ,即QEP)。MySQL数据库，通过Explain指令查看SELECT(5.6.3+版本开始支持update/delete/insert等)，下图为sakila.actor的表结构和一个主建过滤查询的执行计">
+<meta property="og:type" content="article">
+<meta property="og:title" content="细说MySQL Explain和Optimizer Trace简介">
+<meta property="og:url" content="http://yoursite.com/2016/08/11/mysql-explain/index.html">
+<meta property="og:site_name" content="今天">
+<meta property="og:description" content="在开发过程中，对每个上线的SQL查询指纹(query figerprint)的质量都应有估算；而估算DB查询质量最直接的方法，就是分析其查询执行计划( Query Execution Plan ,即QEP)。MySQL数据库，通过Explain指令查看SELECT(5.6.3+版本开始支持update/delete/insert等)，下图为sakila.actor的表结构和一个主建过滤查询的执行计">
+<meta property="og:image" content="http://yoursite.com/images/explain/explain_1.png">
+<meta property="og:image" content="http://yoursite.com/images/explain/explain_2.png">
+<meta property="og:image" content="http://yoursite.com/images/explain/type_all.png">
+<meta property="og:image" content="http://yoursite.com/images/explain/type_index.png">
+<meta property="og:image" content="http://yoursite.com/images/explain/type_range.png">
+<meta property="og:image" content="http://yoursite.com/images/explain/type_index_merge.png">
+<meta property="og:image" content="http://yoursite.com/images/explain/explain_keylen.png">
+<meta property="og:image" content="http://yoursite.com/images/explain/extra_using filesort.png">
+<meta property="og:image" content="http://yoursite.com/images/explain/explain_json.png">
+<meta property="og:image" content="http://yoursite.com/images/explain/explain_v2.png">
+<meta property="og:image" content="http://yoursite.com/images/explain/trace.png">
+<meta property="og:updated_time" content="2016-08-11T11:57:09.000Z">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="细说MySQL Explain和Optimizer Trace简介">
+<meta name="twitter:description" content="在开发过程中，对每个上线的SQL查询指纹(query figerprint)的质量都应有估算；而估算DB查询质量最直接的方法，就是分析其查询执行计划( Query Execution Plan ,即QEP)。MySQL数据库，通过Explain指令查看SELECT(5.6.3+版本开始支持update/delete/insert等)，下图为sakila.actor的表结构和一个主建过滤查询的执行计">
+<meta name="twitter:image" content="http://yoursite.com/images/explain/explain_1.png">
+
+
+
+<script type="text/javascript" id="hexo.configuration">
+  var NexT = window.NexT || {};
+  var CONFIG = {
+    scheme: 'Mist',
+    sidebar: {"position":"left","display":"post"},
+    fancybox: true,
+    motion: true,
+    duoshuo: {
+      userId: 6316444262204442000,
+      author: '今天'
+    }
+  };
+</script>
+
+
+
+
+  <link rel="canonical" href="http://yoursite.com/2016/08/11/mysql-explain/"/>
+
+  <title> 细说MySQL Explain和Optimizer Trace简介 | 今天 </title>
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage" lang="zh-Hans">
+
+  
+
+
+
+
+
+
+
+
+
+
+  
+  
+    
+  
+
+  <div class="container one-collumn sidebar-position-left page-post-detail ">
+    <div class="headband"></div>
+
+    <header id="header" class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-meta ">
+  
+
+  <div class="custom-logo-site-title">
+    <a href="/"  class="brand" rel="start">
+      <span class="logo-line-before"><i></i></span>
+      <span class="site-title">今天</span>
+      <span class="logo-line-after"><i></i></span>
+    </a>
+  </div>
+  <p class="site-subtitle"></p>
+</div>
+
+<div class="site-nav-toggle">
+  <button>
+    <span class="btn-bar"></span>
+    <span class="btn-bar"></span>
+    <span class="btn-bar"></span>
+  </button>
+</div>
+
+<nav class="site-nav">
+  
+
+  
+    <ul id="menu" class="menu">
+      
+        
+        <li class="menu-item menu-item-home">
+          <a href="/" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-home"></i> <br />
+            
+            首页
+          </a>
+        </li>
+      
+        
+        <li class="menu-item menu-item-categories">
+          <a href="/categories" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-th"></i> <br />
+            
+            分类
+          </a>
+        </li>
+      
+        
+        <li class="menu-item menu-item-archives">
+          <a href="/archives" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-archive"></i> <br />
+            
+            归档
+          </a>
+        </li>
+      
+        
+        <li class="menu-item menu-item-books">
+          <a href="/books" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-heartbeat"></i> <br />
+            
+            书单
+          </a>
+        </li>
+      
+
+      
+    </ul>
+  
+
+  
+</nav>
+
+ </div>
+    </header>
+
+    <main id="main" class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          <div id="content" class="content">
+            
+
+  <div id="posts" class="posts-expand">
+    
+
+  
+  
+
+  
+  
+  
+
+  <article class="post post-type-normal " itemscope itemtype="http://schema.org/Article">
+
+    
+      <header class="post-header">
+
+        
+        
+          <h1 class="post-title" itemprop="name headline">
+            
+            
+              
+                细说MySQL Explain和Optimizer Trace简介
+              
+            
+          </h1>
+        
+
+        <div class="post-meta">
+          <span class="post-time">
+            <span class="post-meta-item-icon">
+              <i class="fa fa-calendar-o"></i>
+            </span>
+            <span class="post-meta-item-text">发表于</span>
+            <time itemprop="dateCreated" datetime="2016-08-11T19:18:00+08:00" content="2016-08-11">
+              2016-08-11
+            </time>
+          </span>
+
+          
+            <span class="post-category" >
+              &nbsp; | &nbsp;
+              <span class="post-meta-item-icon">
+                <i class="fa fa-folder-o"></i>
+              </span>
+              <span class="post-meta-item-text">分类于</span>
+              
+                <span itemprop="about" itemscope itemtype="https://schema.org/Thing">
+                  <a href="/categories/MySQL/" itemprop="url" rel="index">
+                    <span itemprop="name">MySQL</span>
+                  </a>
+                </span>
+
+                
+                
+
+              
+            </span>
+          
+
+          
+            
+              <span class="post-comments-count">
+                &nbsp; | &nbsp;
+                <a href="/2016/08/11/mysql-explain/#comments" itemprop="discussionUrl">
+                  <span class="post-comments-count ds-thread-count" data-thread-key="2016/08/11/mysql-explain/" itemprop="commentsCount"></span>
+                </a>
+              </span>
+            
+          
+
+          
+
+          
+          
+
+          
+              &nbsp; | &nbsp;
+              <span class="page-pv"><i class="fa fa-file-o"></i>
+              <span class="busuanzi-value" id="busuanzi_value_page_pv" ></span>
+              </span>
+          
+        </div>
+      </header>
+    
+
+
+    <div class="post-body" itemprop="articleBody">
+
+      
+      
+
+      
+        <p>在开发过程中，对每个上线的SQL查询指纹(query figerprint)的质量都应有估算；而估算DB查询质量最直接的方法，就是分析其查询执行计划( Query Execution Plan ,即QEP)。<br>MySQL数据库，通过Explain指令查看SELECT(5.6.3+版本开始支持update/delete/insert等)，下图为sakila.actor的表结构和一个主建过滤查询的执行计划。<br><img src="/images/explain/explain_1.png" alt="explain_1"><br>本文细说从以下三个方面:<br>    1.如何读取EXPLAIN的输出结果<br>    2.简介MySQL5.6的 EXPLAIN FORMAT = JSON和MySQL Workbench的Visual Explain<br>    3.简介MySQL的CBO和Optimizer Trace</p>
+<hr>
+<h2 id="如何读取EXPLAIN的输出结果"><a href="#如何读取EXPLAIN的输出结果" class="headerlink" title="如何读取EXPLAIN的输出结果"></a>如何读取EXPLAIN的输出结果</h2><p>EXPLAIN的输出一般12个字段(其中partitions和filtered 5.5版本普通模式下没有），会对重要的字段内容进行分析说明<br><img src="/images/explain/explain_2.png" alt="explain_1"><br>本节详细分析，每个字段的含义和使用。</p>
+<h3 id="id字段"><a href="#id字段" class="headerlink" title="id字段"></a>id字段</h3><p>表示SELECT查询标识符，用于标识执行顺序，基本是数字；<br>执行顺序原则：id数据值大的优先执行,id值相同的从上往下顺序执行； 上图id值都为1，故SQ先执行actor表的查询</p>
+<h3 id="select-type字段"><a href="#select-type字段" class="headerlink" title="select_type字段"></a>select_type字段</h3><p>表示select子句的类型，常值有：<br>SIMPLE: 简单查询，查询子句不包含UNION或子查询<br>PRIMARY：最外层的SELECT子句<br>UNION: UNION子句右侧的SELECT子句<br>SUBQUERY: 子查询中第一个SELECT<br>DERIVED: 衍生表的SELECT子句</p>
+<h3 id="table字段"><a href="#table字段" class="headerlink" title="table字段"></a>table字段</h3><p>表示查询涉及的表或衍生表； 图2中：第一行操作的actor表的查询，第二行操作是file_actor表的查询；</p>
+<h3 id="partitions字段："><a href="#partitions字段：" class="headerlink" title="partitions字段："></a>partitions字段：</h3><p>针对MySQL内置分区表，表示当前使用了哪些子分区；用于确认查询对分区的过滤效率</p>
+<h3 id="type字段-重要"><a href="#type字段-重要" class="headerlink" title="type字段[重要]"></a>type字段[重要]</h3><p>表示查询的access type,表示查询是否为”全表扫描“，”索引扫描“等<br>常见以下几种类型，查询效率由最差到最好<br>all&lt;index&lt;range ~ index_merge&lt; ref&lt;eq_ref&lt;const&lt;system(效率理论从最差到最好）<br>详细说明每种常见type表示的含义</p>
+<ul>
+<li>5.1 ALL 表示”全表扫描”(full table scan), 性能是最差的几种查询之一，如果查询的表比较大，且查询频次高，对MySQL数据库有致命的性能影响。<br>见下图：因last_update字段没有索引，帮整体是全表扫描， 扫描rows 200条<br><img src="/images/explain/type_all.png" alt="explain_1"></li>
+<li>5.2 index 表示“全索引扫描”(full index scan)，其类型和ALL较类似，性能也是比较差;  和ALL区别在于只对索引树进行扫描，但索引没有起到过滤作用。<br><img src="/images/explain/type_index.png" alt="explain_1"></li>
+<li>5.3 range 表示“索引范围扫描”， 通过索引字段范围获取表中部分数据记录； 常常用于in,&gt;,&lt; between等操作，查询效率一般不错。 下图rows只扫描了4行数据，就获取到指定数据<br><img src="/images/explain/type_range.png" alt="explain_1"></li>
+<li>5.4 index_merge MySQL查询优化器发现查询可以同时使用多个索引查询结果集进行并集或交集的情况，就会使用index_merge type。<br>此时key字段有两个或多个索引， key_len/rows都分别有两个数值； 如果是并集操作”Using intersect”, 往往通过两个索引的字段，合并为一个索引，避免index_merge查询<br>下图中两个SQL一个是AND/OR, Using intersect 和Using union 分别表示使用两个索引后的交集和并集<br><img src="/images/explain/type_index_merge.png" alt="explain_1"></li>
+<li>5.5 ref 针对于非唯一或主键索引，或使用二者”最左部分字段”索引的等值查询或多表join，查询效率由这个值返回的行数多少决定</li>
+<li>5.6 eq_ref  使用于多表的join时，被驱动表的过滤字段是主键或唯一索引，查询效率很好</li>
+<li>5.7 const  针对主键或唯一索引的等值查询扫描，最多只返回一行数据</li>
+<li>5.8 system: 是一种特殊const类型，被查询表中有且只有一条数据<h3 id="possible-keys字段"><a href="#possible-keys字段" class="headerlink" title="possible_keys字段"></a>possible_keys字段</h3>   表示MySQL查询优化器发现当前查询可能被使用地索引，但不一定能会利用，如果possible_key的列举的索引越多，往往说明索引创建不合理，查询效率不是最高效；<br>因为优化器会分析尽可能多的索引，评估哪个索引的“成本”消耗局部最低，这个评估过程消耗时间和资源的。<h3 id="key-字段-重要"><a href="#key-字段-重要" class="headerlink" title="key 字段[重要]"></a>key 字段[重要]</h3>表示查询优化器真正使用的索引(可能多个，如前index_merge), 如果是索引覆盖，那么索引不会在possible_keys中出现的;  注意：对于组合索引，查询可能只使用其部分字段，详细见下面key_len计算分析<h3 id="key-len字段-重要"><a href="#key-len字段-重要" class="headerlink" title="key_len字段[重要]"></a>key_len字段[重要]</h3>表示查询优化器使用了索引的字节数，可以评估组合索引是否完全被使用，或只有最左部分字段使用<br>key_len字节的计算规则：</li>
+<li>字符串：char(n) - n字节， varchar(n)- n字节 + 2字节(变长),   ，  多字节charset * [1~4]字节（utf8为3字节，utf8mb4为4字节计算）</li>
+<li>数值类型： TINYINT-1字节，SMALLINT-2字节， MEDIUMINT-3字节， INT-4字节，BIGINT-8字节</li>
+<li>时间类型：DATE-3字节， TIMESTAMP-4字节， DATETIME-8字节</li>
+<li>字段属性：NULL属性+ 1字节<br>计算demo:<br>下图两个SQL使用相同的索引，但索引的效果和key_len却分别是9字节和119字节<br>SQL1 key_len计算： pay_user_id字段8字节（bigint not null) +  product_type字段 1个字节 = 共9个字节， 说明SQL1只使用了idx_userid组合索引的前2个字段，product_id字段未使用，过滤性不太好。<br>SQL key_len计算:   前两字段9字节+ product_id字段110字节 （ varchar(36) utf8字符集和2字节变长， 36*3+2为110字节） = 9 + 110=119字节， SQL2使用了前三个字段，过滤性较好<br><img src="/images/explain/explain_keylen.png" alt="explain_1"><h3 id="rows-字段-重要"><a href="#rows-字段-重要" class="headerlink" title="rows 字段[重要]"></a>rows 字段[重要]</h3> MySQL查询优化器根据统计信息，估算SQL要查找到结果集需要扫描读取的数据行数;  这个值非常直观显示SQL的效率好坏，原则rows越少越好。<br>后文会计划的优化器的cost估算时，ROW_EVALUATE_COST就是扫描1行数据，算0.2</li>
+</ul>
+<h3 id="Extra字段-重要"><a href="#Extra字段-重要" class="headerlink" title="Extra字段[重要]"></a>Extra字段[重要]</h3><p>MySQL执行计划很多额外的信息在Extra字段显示，常见的有以下几种内容</p>
+<ul>
+<li>10.1 Using filesort<br>MySQL需额外的排序操作，不能通过索引顺序达到排序效果；又叫”文件排序“，易错误理论为排序结果过大，内存中不够需写磁盘文件排序。<br>一般有filesort，都建议优化去掉，CPU资源消耗大。 下图last_update排序，但此字段无索引，故需filesort<br><img src="/images/explain/extra_using filesort.png" alt="explain_1"></li>
+<li>10.2 Using index<br>”覆盖索引扫描“，表示查询在索引树中就可查找所需数据，不用回表数据文件(回表操作），往往说明性能不错</li>
+<li>10.3 Using temporary<br>查询有使用临时表，一般出现于排序，分组和多表join的情况，查询效率不高，建议优化</li>
+</ul>
+<h2 id="简介EXPLAIN-FORMAT-JSON-和-MySQL-Workbench的Visual-Explain"><a href="#简介EXPLAIN-FORMAT-JSON-和-MySQL-Workbench的Visual-Explain" class="headerlink" title="简介EXPLAIN FORMAT=JSON 和 MySQL Workbench的Visual Explain"></a>简介EXPLAIN FORMAT=JSON 和 MySQL Workbench的Visual Explain</h2><h3 id="EXPLAIN-FORMAT-JSON"><a href="#EXPLAIN-FORMAT-JSON" class="headerlink" title="EXPLAIN FORMAT=JSON"></a>EXPLAIN FORMAT=JSON</h3><p>从MySQL5.6，支持JSON格式的输出；输出的结果信息更详细，针对复杂查询的执行计划结构顺序更加清晰<br>explain format=json select f.film_id, f.title, c.name from film f  inner join film_category fc on f.film_id=fc.film_id inner join category c on fc.category_id = c.category_id where f.title like ‘B%’;</p>
+<p><img src="/images/explain/explain_json.png" alt="explain_1"></p>
+<h3 id="MySQL-Workbench的Visual-Explain"><a href="#MySQL-Workbench的Visual-Explain" class="headerlink" title="MySQL Workbench的Visual Explain"></a>MySQL Workbench的Visual Explain</h3><p>MySQL Workbench的Visual Explain<br> 执行计划的读取是：从左往右，从下往上<br><img src="/images/explain/explain_v2.png" alt="explain_1"></p>
+<h2 id="简介MySQL的CBO和Optimizer-Trace"><a href="#简介MySQL的CBO和Optimizer-Trace" class="headerlink" title="简介MySQL的CBO和Optimizer Trace"></a>简介MySQL的CBO和Optimizer Trace</h2><p>从MySQL5.6版本开始，可支持把MySQL查询执行计划树打印出来，对DBA深入分析SQL执行计划，COST成本都非常有用，打印的内部信息比较全面；<br>功能支持动态开关，因为对性能有20%左右影响，只建议分析问题时，临时开启<br>1 使用方式 set session  optimizer_trace= “enabled=on”;   然后执行你要分析的SQL, 再执行SELECT trace FROM information_schema.OPTIMIZER_TRACE；就可查看SQL的Optimizer Trace信息<br>DEMO：<br>set session  optimizer_trace= “enabled=on”;<br>select <em>  from actor ;<br>SELECT trace FROM information_schema.OPTIMIZER_TRACE\G<br>使用场景举例：计算评估查询的“成本” CBO<br>   MySQL优化器通过计算每种可能计划的“成本”，最终选择“成本”最小的作为执行计划。<br>MySQL查询优化器都是Cost Model包含两个模型IO和CPU<br>以下为Table scan的情况的IO计算公式，用于验证 Optimizer Trace的cost-info是否一致<br>IO Cost : 读取的table/index的页个数 </em> O_BLOCK_READ_COST    #其中O_BLOCK_READ_COST常量为1<br>CPU Cost: 读取行数 rows <em> ROW_EVALUATE_COST  #其中ROW_EVALUATE_COST常量为0.2<br>计算 select </em> from actor 这个查询的执行计划cost-info：<br>通过 select <em> from mysql.innodb_index_stats where table_name =’actor’ and stat_name=’size’;  获取这次表扫描primary只有1个page，rows为200行<br>总体cost = io-cost+cpu-cost = 1 pages </em> O_BLOCK_READ_COST  + 200 rows <em> ROW_EVALUATE_COST= 1</em>1 + 200 * 0.2 = 41<br>和图中”best_access_path”中cost值41相匹配。（当然MySQL在Range,join等复杂SQL的查询分析，相当复杂，这里只是举例说明trace输出信息的强大）<br>输出结果如下图：<br><img src="/images/explain/trace.png" alt="explain_1"></p>
+
+      
+    </div>
+
+    <div>
+      
+        
+
+      
+    </div>
+
+    <div>
+      
+        
+
+      
+    </div>
+
+    <footer class="post-footer">
+      
+        <div class="post-tags">
+          
+            <a href="/tags/MySQL/" rel="tag">#MySQL</a>
+          
+        </div>
+      
+
+      
+        <div class="post-nav">
+          <div class="post-nav-next post-nav-item">
+            
+              <a href="/2016/08/05/redis-useless-keys/" rel="next" title="Redis的“死键”问题">
+                <i class="fa fa-chevron-left"></i> Redis的“死键”问题
+              </a>
+            
+          </div>
+
+          <div class="post-nav-prev post-nav-item">
+            
+          </div>
+        </div>
+      
+
+      
+      
+    </footer>
+  </article>
+
+
+
+    <div class="post-spread">
+      
+        <!-- JiaThis Button BEGIN -->
+<div class="jiathis_style">
+  <a class="jiathis_button_tsina"></a>
+  <a class="jiathis_button_tqq"></a>
+  <a class="jiathis_button_weixin"></a>
+  <a class="jiathis_button_cqq"></a>
+  <a class="jiathis_button_douban"></a>
+  <a class="jiathis_button_renren"></a>
+  <a class="jiathis_button_qzone"></a>
+  <a class="jiathis_button_kaixin001"></a>
+  <a class="jiathis_button_copy"></a>
+  <a href="http://www.jiathis.com/share" class="jiathis jiathis_txt jiathis_separator jtico jtico_jiathis" target="_blank"></a>
+  <a class="jiathis_counter_style"></a>
+</div>
+<script type="text/javascript" >
+  var jiathis_config={
+    hideMore:false
+  }
+</script>
+<script type="text/javascript" src="http://v3.jiathis.com/code/jia.js" charset="utf-8"></script>
+<!-- JiaThis Button END -->
+
+      
+    </div>
+  </div>
+
+
+          </div>
+          
+
+
+          
+  <div class="comments" id="comments">
+    
+      <div class="ds-thread" data-thread-key="2016/08/11/mysql-explain/"
+           data-title="细说MySQL Explain和Optimizer Trace简介" data-url="http://yoursite.com/2016/08/11/mysql-explain/">
+      </div>
+    
+  </div>
+
+
+        </div>
+        
+          
+  
+  <div class="sidebar-toggle">
+    <div class="sidebar-toggle-line-wrap">
+      <span class="sidebar-toggle-line sidebar-toggle-line-first"></span>
+      <span class="sidebar-toggle-line sidebar-toggle-line-middle"></span>
+      <span class="sidebar-toggle-line sidebar-toggle-line-last"></span>
+    </div>
+  </div>
+
+  <aside id="sidebar" class="sidebar">
+    <div class="sidebar-inner">
+
+      
+
+      
+        <ul class="sidebar-nav motion-element">
+          <li class="sidebar-nav-toc sidebar-nav-active" data-target="post-toc-wrap" >
+            文章目录
+          </li>
+          <li class="sidebar-nav-overview" data-target="site-overview">
+            站点概览
+          </li>
+        </ul>
+      
+
+      <section class="site-overview sidebar-panel ">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+          <img class="site-author-image" itemprop="image"
+               src="/uploads/avatar.jpg"
+               alt="Roger Zhuo" />
+          <p class="site-author-name" itemprop="name">Roger Zhuo</p>
+          <p class="site-description motion-element" itemprop="description">汝林的Blog</p>
+        </div>
+        <nav class="site-state motion-element">
+          <div class="site-state-item site-state-posts">
+            <a href="/archives">
+              <span class="site-state-item-count">6</span>
+              <span class="site-state-item-name">日志</span>
+            </a>
+          </div>
+
+          
+            <div class="site-state-item site-state-categories">
+              <a href="/categories">
+                <span class="site-state-item-count">2</span>
+                <span class="site-state-item-name">分类</span>
+              </a>
+            </div>
+          
+
+          
+            <div class="site-state-item site-state-tags">
+              
+                <span class="site-state-item-count">3</span>
+                <span class="site-state-item-name">标签</span>
+              
+            </div>
+          
+
+        </nav>
+
+        
+          <div class="feed-link motion-element">
+            <a href="/atom.xml" rel="alternate">
+              <i class="fa fa-rss"></i>
+              RSS
+            </a>
+          </div>
+        
+
+        <div class="links-of-author motion-element">
+          
+            
+              <span class="links-of-author-item">
+                <a href="https://github.com/ZhuoRoger" target="_blank" title="GitHub">
+                  
+                    <i class="fa fa-fw fa-github"></i>
+                  
+                  GitHub
+                </a>
+              </span>
+            
+              <span class="links-of-author-item">
+                <a href="http://weibo.com/2540962412" target="_blank" title="微博">
+                  
+                    <i class="fa fa-fw fa-globe"></i>
+                  
+                  微博
+                </a>
+              </span>
+            
+          
+        </div>
+
+        
+        
+
+        
+        
+          <div class="links-of-blogroll motion-element links-of-blogroll-inline">
+            <div class="links-of-blogroll-title">
+              <i class="fa  fa-fw fa-globe"></i>
+              
+            </div>
+            <ul class="links-of-blogroll-list">
+              
+                <li class="links-of-blogroll-item">
+                  <a href="https://www.percona.com/blog/" title="Percona" target="_blank">Percona</a>
+                </li>
+              
+            </ul>
+          </div>
+        
+
+      </section>
+
+      
+        <section class="post-toc-wrap motion-element sidebar-panel sidebar-panel-active">
+          <div class="post-toc">
+            
+              
+            
+            
+              <div class="post-toc-content"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#如何读取EXPLAIN的输出结果"><span class="nav-number">1.</span> <span class="nav-text">如何读取EXPLAIN的输出结果</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#id字段"><span class="nav-number">1.1.</span> <span class="nav-text">id字段</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#select-type字段"><span class="nav-number">1.2.</span> <span class="nav-text">select_type字段</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#table字段"><span class="nav-number">1.3.</span> <span class="nav-text">table字段</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#partitions字段："><span class="nav-number">1.4.</span> <span class="nav-text">partitions字段：</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#type字段-重要"><span class="nav-number">1.5.</span> <span class="nav-text">type字段[重要]</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#possible-keys字段"><span class="nav-number">1.6.</span> <span class="nav-text">possible_keys字段</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#key-字段-重要"><span class="nav-number">1.7.</span> <span class="nav-text">key 字段[重要]</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#key-len字段-重要"><span class="nav-number">1.8.</span> <span class="nav-text">key_len字段[重要]</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#rows-字段-重要"><span class="nav-number">1.9.</span> <span class="nav-text">rows 字段[重要]</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Extra字段-重要"><span class="nav-number">1.10.</span> <span class="nav-text">Extra字段[重要]</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#简介EXPLAIN-FORMAT-JSON-和-MySQL-Workbench的Visual-Explain"><span class="nav-number">2.</span> <span class="nav-text">简介EXPLAIN FORMAT=JSON 和 MySQL Workbench的Visual Explain</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#EXPLAIN-FORMAT-JSON"><span class="nav-number">2.1.</span> <span class="nav-text">EXPLAIN FORMAT=JSON</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#MySQL-Workbench的Visual-Explain"><span class="nav-number">2.2.</span> <span class="nav-text">MySQL Workbench的Visual Explain</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#简介MySQL的CBO和Optimizer-Trace"><span class="nav-number">3.</span> <span class="nav-text">简介MySQL的CBO和Optimizer Trace</span></a></li></ol></div>
+            
+          </div>
+        </section>
+      
+
+    </div>
+  </aside>
+
+
+        
+      </div>
+    </main>
+
+    <footer id="footer" class="footer">
+      <div class="footer-inner">
+        <div class="copyright" >
+  
+  &copy; 
+  <span itemprop="copyrightYear">2016</span>
+  <span class="with-love">
+    <i class="fa fa-heart"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">Roger Zhuo</span>
+</div>
+
+<div class="powered-by">
+  由 <a class="theme-link" href="https://hexo.io">Hexo</a> 强力驱动
+</div>
+
+<div class="theme-info">
+  主题 -
+  <a class="theme-link" href="https://github.com/iissnan/hexo-theme-next">
+    NexT.Mist
+  </a>
+</div>
+
+        
+
+<div class="busuanzi-count">
+
+  <script async src="https://dn-lbstatics.qbox.me/busuanzi/2.3/busuanzi.pure.mini.js"></script>
+
+  
+    <span class="site-uv"><i class="fa fa-user"></i><span class="busuanzi-value" id="busuanzi_value_site_uv"></span></span>
+  
+
+  
+    <span class="site-pv"><i class="fa fa-eye"></i><span class="busuanzi-value" id="busuanzi_value_site_pv"></span></span>
+  
+  
+</div>
+
+
+
+        
+      </div>
+    </footer>
+
+    <div class="back-to-top">
+      <i class="fa fa-arrow-up"></i>
+    </div>
+  </div>
+
+  
+
+<script type="text/javascript">
+  if (Object.prototype.toString.call(window.Promise) !== '[object Function]') {
+    window.Promise = null;
+  }
+</script>
+
+
+
+
+
+
+
+
+
+  
+
+
+
+  
+  <script type="text/javascript" src="/vendors/jquery/index.js?v=2.1.3"></script>
+
+  
+  <script type="text/javascript" src="/vendors/fastclick/lib/fastclick.min.js?v=1.0.6"></script>
+
+  
+  <script type="text/javascript" src="/vendors/jquery_lazyload/jquery.lazyload.js?v=1.9.7"></script>
+
+  
+  <script type="text/javascript" src="/vendors/velocity/velocity.min.js?v=1.2.1"></script>
+
+  
+  <script type="text/javascript" src="/vendors/velocity/velocity.ui.min.js?v=1.2.1"></script>
+
+  
+  <script type="text/javascript" src="/vendors/fancybox/source/jquery.fancybox.pack.js?v=2.1.5"></script>
+
+
+  
+
+
+  <script type="text/javascript" src="/js/src/utils.js?v=5.0.1"></script>
+
+  <script type="text/javascript" src="/js/src/motion.js?v=5.0.1"></script>
+
+
+
+  
+  
+
+  
+  <script type="text/javascript" src="/js/src/scrollspy.js?v=5.0.1"></script>
+<script type="text/javascript" src="/js/src/post-details.js?v=5.0.1"></script>
+
+
+
+  
+
+
+  <script type="text/javascript" src="/js/src/bootstrap.js?v=5.0.1"></script>
+
+
+
+  
+
+  
+    
+  
+
+  <script type="text/javascript">
+    var duoshuoQuery = {short_name:"rogerzhuo"};
+    (function() {
+      var ds = document.createElement('script');
+      ds.type = 'text/javascript';ds.async = true;
+      ds.id = 'duoshuo-script';
+      ds.src = (document.location.protocol == 'https:' ? 'https:' : 'http:') + '//static.duoshuo.com/embed.js';
+      ds.charset = 'UTF-8';
+      (document.getElementsByTagName('head')[0]
+      || document.getElementsByTagName('body')[0]).appendChild(ds);
+    })();
+  </script>
+
+  
+    
+    <script src="/vendors/ua-parser-js/dist/ua-parser.min.js?v=0.7.9"></script>
+    <script src="/js/src/hook-duoshuo.js"></script>
+  
+
+
+
+
+
+
+  
+  
+
+  
+
+  
+
+  
+
+</body>
+</html>
