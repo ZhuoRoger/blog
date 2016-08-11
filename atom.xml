@@ -368,7 +368,7 @@
     <link href="http://yoursite.com/2016/07/30/redis-client-two-buffers/"/>
     <id>http://yoursite.com/2016/07/30/redis-client-two-buffers/</id>
     <published>2016-07-30T08:29:33.000Z</published>
-    <updated>2016-08-11T12:13:15.000Z</updated>
+    <updated>2016-08-11T12:15:34.000Z</updated>
     
     <content type="html"><![CDATA[<p>每个Redis客户端（以下简称”Client”)都有多个状态属性，而理解和分析这些属性，对于我们设计Redis键空间和运营管理都有帮助。<br>本文将详细分析Client的两个重要属性：Query buffer（输入缓冲区）、Output buffers（输出缓冲区）</p>
 <hr>
