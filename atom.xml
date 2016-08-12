@@ -5,7 +5,7 @@
   <link href="/atom.xml" rel="self"/>
   
   <link href="http://yoursite.com/"/>
-  <updated>2016-08-11T12:12:44.000Z</updated>
+  <updated>2016-08-12T12:36:22.000Z</updated>
   <id>http://yoursite.com/</id>
   
   <author>
@@ -14,6 +14,51 @@
   </author>
   
   <generator uri="http://hexo.io/">Hexo</generator>
+  
+  <entry>
+    <title>Redis优雅地删除大键-草稿</title>
+    <link href="http://yoursite.com/2016/08/12/redis-delete-big-keys/"/>
+    <id>http://yoursite.com/2016/08/12/redis-delete-big-keys/</id>
+    <published>2016-08-12T10:43:41.000Z</published>
+    <updated>2016-08-12T12:36:22.000Z</updated>
+    
+    <content type="html"><![CDATA[<p>关于Redis大键(Key)，我们从[空间复杂性]和访问它的[时间复杂度]两个方面来定义大键。<br>前者主要表示Redis键的占用内存大小；后者表示Redis集合数据类型(set/hash/list/sorted set)键，所含有的元素个数。<br>以下两个示例：</p>
+<blockquote>
+<p>1个大小200MB的String键(String Object最大512MB)；内存空间角度占用较大<br> 1个包含100000000(1kw)个字段的Hash键，对应访问模式(如hgetall)时间复杂度高</p>
+</blockquote>
+<p>因为内存空间复杂性处理耗时都非常小，测试 del 200MB String键耗时约1毫秒，<br>而删除一个含有1kw个字段的Hash键，却会阻塞Redis进程数十秒。所以本文只从时间复杂度分析大的集合类键。删除这种大键的风险，以及怎么优雅地删除。</p>
+<blockquote>
+<p>说明：本文删除大key的方法，只适用于支持scan命令的Redis2.8+版本</p>
+</blockquote>
+<h2 id=""><a href="#" class="headerlink" title=""></a><a id="more"></a></h2><p>在Redis集群中，应用程序尽量避免使用大键；直接影响容易导致集群的容量和请求出现”倾斜问题“，具体分析见文章：<a href="/2016/08/03/redis-cluster-imbalance/" title="redis-cluster-imbalance">redis-cluster-imbalance</a></p>
+<h2 id="直接删除大key的风险"><a href="#直接删除大key的风险" class="headerlink" title="直接删除大key的风险"></a>直接删除大key的风险</h2><p>DEL命令在删除单个集合类型的Key时，命令的时间复杂度是O(M) M是集合类型Key包含的元素个数。</p>
+<blockquote>
+<p>Time complexity: O(N) where N is the number of keys that will be removed. When a key to remove holds a value other than a string, the individual complexity for this key is O(M) where M is the number of elements in the list, set, sorted set or hash. Removing a single key that holds a string value is O(1).</p>
+</blockquote>
+<p>生产环境中遇到过多次因业务删除大Key，导致Redis阻塞，出现故障切换和访问Redis的应用程序雪崩的情况。<br>测试删除集合类型大Key耗时，一般每秒可清理10w~数十w个元数; 如果数百w个元素的大key时，会导致Redis阻塞上10秒<br>可能导致集群判断Redis已经故障，出现故障切换；或应用程序没有fast fail机制，出现雪崩的情况。<br>当我们发现集群中有大key时，要删除时，如何youya地处理呢？</p>
+<h2 id="如何优ya地删除各类大key"><a href="#如何优ya地删除各类大key" class="headerlink" title="如何优ya地删除各类大key"></a>如何优ya地删除各类大key</h2><p>从Redis2.8版本开始支持<a href="http://redis.io/commands/scan" target="_blank" rel="external">SCAN</a>命令，通过m次时间复杂度为O(1)的方式，遍历包含n个元素的大key.<br>这样避免单个O(n)的大命令，导致Redis阻塞。 这里删除大key操作的思想也是如此。</p>
+]]></content>
+    
+    <summary type="html">
+    
+      &lt;p&gt;关于Redis大键(Key)，我们从[空间复杂性]和访问它的[时间复杂度]两个方面来定义大键。&lt;br&gt;前者主要表示Redis键的占用内存大小；后者表示Redis集合数据类型(set/hash/list/sorted set)键，所含有的元素个数。&lt;br&gt;以下两个示例：&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;p&gt;1个大小200MB的String键(String Object最大512MB)；内存空间角度占用较大&lt;br&gt; 1个包含100000000(1kw)个字段的Hash键，对应访问模式(如hgetall)时间复杂度高&lt;/p&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;因为内存空间复杂性处理耗时都非常小，测试 del 200MB String键耗时约1毫秒，&lt;br&gt;而删除一个含有1kw个字段的Hash键，却会阻塞Redis进程数十秒。所以本文只从时间复杂度分析大的集合类键。删除这种大键的风险，以及怎么优雅地删除。&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;p&gt;说明：本文删除大key的方法，只适用于支持scan命令的Redis2.8+版本&lt;/p&gt;
+&lt;/blockquote&gt;
+&lt;h2 id=&quot;&quot;&gt;&lt;a href=&quot;#&quot; class=&quot;headerlink&quot; title=&quot;&quot;&gt;&lt;/a&gt;
+    
+    </summary>
+    
+      <category term="Redis" scheme="http://yoursite.com/categories/Redis/"/>
+    
+    
+      <category term="Redis" scheme="http://yoursite.com/tags/Redis/"/>
+    
+  </entry>
   
   <entry>
     <title>细说MySQL Explain和Optimizer Trace简介</title>

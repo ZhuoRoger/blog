@@ -250,6 +250,136 @@
             
               
                 
+                <a class="post-title-link" href="/2016/08/12/redis-delete-big-keys/" itemprop="url">
+                  Redis优雅地删除大键-草稿
+                </a>
+              
+            
+          </h1>
+        
+
+        <div class="post-meta">
+          <span class="post-time">
+            <span class="post-meta-item-icon">
+              <i class="fa fa-calendar-o"></i>
+            </span>
+            <span class="post-meta-item-text">发表于</span>
+            <time itemprop="dateCreated" datetime="2016-08-12T18:43:41+08:00" content="2016-08-12">
+              2016-08-12
+            </time>
+          </span>
+
+          
+            <span class="post-category" >
+              &nbsp; | &nbsp;
+              <span class="post-meta-item-icon">
+                <i class="fa fa-folder-o"></i>
+              </span>
+              <span class="post-meta-item-text">分类于</span>
+              
+                <span itemprop="about" itemscope itemtype="https://schema.org/Thing">
+                  <a href="/categories/Redis/" itemprop="url" rel="index">
+                    <span itemprop="name">Redis</span>
+                  </a>
+                </span>
+
+                
+                
+
+              
+            </span>
+          
+
+          
+            
+              <span class="post-comments-count">
+                &nbsp; | &nbsp;
+                <a href="/2016/08/12/redis-delete-big-keys/#comments" itemprop="discussionUrl">
+                  <span class="post-comments-count ds-thread-count" data-thread-key="2016/08/12/redis-delete-big-keys/" itemprop="commentsCount"></span>
+                </a>
+              </span>
+            
+          
+
+          
+
+          
+          
+
+          
+        </div>
+      </header>
+    
+
+
+    <div class="post-body" itemprop="articleBody">
+
+      
+      
+
+      
+        
+          <p>关于Redis大键(Key)，我们从[空间复杂性]和访问它的[时间复杂度]两个方面来定义大键。<br>前者主要表示Redis键的占用内存大小；后者表示Redis集合数据类型(set/hash/list/sorted set)键，所含有的元素个数。<br>以下两个示例：</p>
+<blockquote>
+<p>1个大小200MB的String键(String Object最大512MB)；内存空间角度占用较大<br> 1个包含100000000(1kw)个字段的Hash键，对应访问模式(如hgetall)时间复杂度高</p>
+</blockquote>
+<p>因为内存空间复杂性处理耗时都非常小，测试 del 200MB String键耗时约1毫秒，<br>而删除一个含有1kw个字段的Hash键，却会阻塞Redis进程数十秒。所以本文只从时间复杂度分析大的集合类键。删除这种大键的风险，以及怎么优雅地删除。</p>
+<blockquote>
+<p>说明：本文删除大key的方法，只适用于支持scan命令的Redis2.8+版本</p>
+</blockquote>
+<h2 id=""><a href="#" class="headerlink" title=""></a>
+          <div class="post-more-link text-center">
+            <a class="btn" href="/2016/08/12/redis-delete-big-keys/#more" rel="contents">
+              阅读全文 &raquo;
+            </a>
+          </div>
+        
+      
+    </div>
+
+    <div>
+      
+    </div>
+
+    <div>
+      
+    </div>
+
+    <footer class="post-footer">
+      
+
+      
+
+      
+      
+        <div class="post-eof"></div>
+      
+    </footer>
+  </article>
+
+
+    
+      
+
+  
+  
+
+  
+  
+  
+
+  <article class="post post-type-normal " itemscope itemtype="http://schema.org/Article">
+
+    
+      <header class="post-header">
+
+        
+        
+          <h1 class="post-title" itemprop="name headline">
+            
+            
+              
+                
                 <a class="post-title-link" href="/2016/08/11/mysql-explain/" itemprop="url">
                   细说MySQL Explain和Optimizer Trace简介
                 </a>
@@ -1008,7 +1138,7 @@
         <nav class="site-state motion-element">
           <div class="site-state-item site-state-posts">
             <a href="/archives">
-              <span class="site-state-item-count">6</span>
+              <span class="site-state-item-count">7</span>
               <span class="site-state-item-name">日志</span>
             </a>
           </div>
