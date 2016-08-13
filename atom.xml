@@ -5,7 +5,7 @@
   <link href="/atom.xml" rel="self"/>
   
   <link href="http://yoursite.com/"/>
-  <updated>2016-08-13T07:26:47.000Z</updated>
+  <updated>2016-08-13T07:29:37.000Z</updated>
   <id>http://yoursite.com/</id>
   
   <author>
@@ -16,11 +16,11 @@
   <generator uri="http://hexo.io/">Hexo</generator>
   
   <entry>
-    <title>优雅地删除Redis大键</title>
-    <link href="http://yoursite.com/2016/08/12/redis-delete-big-keys/"/>
-    <id>http://yoursite.com/2016/08/12/redis-delete-big-keys/</id>
+    <title>如何优雅地删除Redis大键</title>
+    <link href="http://yoursite.com/2016/08/12/redis-delete-large-keys/"/>
+    <id>http://yoursite.com/2016/08/12/redis-delete-large-keys/</id>
     <published>2016-08-12T10:43:41.000Z</published>
-    <updated>2016-08-13T07:26:47.000Z</updated>
+    <updated>2016-08-13T07:29:37.000Z</updated>
     
     <content type="html"><![CDATA[<p>关于Redis大键(Key)，我们从[空间复杂性]和访问它的[时间复杂度]两个方面来定义大键。<br>前者主要表示Redis键的占用内存大小；后者表示Redis集合数据类型(set/hash/list/sorted set)键，所含有的元素个数。以下两个示例：</p>
 <blockquote>

@@ -250,8 +250,8 @@
             
               
                 
-                <a class="post-title-link" href="/2016/08/12/redis-delete-big-keys/" itemprop="url">
-                  优雅地删除Redis大键
+                <a class="post-title-link" href="/2016/08/12/redis-delete-large-keys/" itemprop="url">
+                  如何优雅地删除Redis大键
                 </a>
               
             
@@ -294,8 +294,8 @@
             
               <span class="post-comments-count">
                 &nbsp; | &nbsp;
-                <a href="/2016/08/12/redis-delete-big-keys/#comments" itemprop="discussionUrl">
-                  <span class="post-comments-count ds-thread-count" data-thread-key="2016/08/12/redis-delete-big-keys/" itemprop="commentsCount"></span>
+                <a href="/2016/08/12/redis-delete-large-keys/#comments" itemprop="discussionUrl">
+                  <span class="post-comments-count ds-thread-count" data-thread-key="2016/08/12/redis-delete-large-keys/" itemprop="commentsCount"></span>
                 </a>
               </span>
             
@@ -325,7 +325,7 @@
 </blockquote>
 <p>因为内存空间复杂性处理耗时都非常小，测试 del 200MB String键耗时约1毫秒，<br>而删除一个含有1kw个字段的Hash键，却会阻塞Redis进程数十秒。所以本文只从时间复杂度分析大的集合类键。删除这种大键的风险，以及怎么优雅地删除。</p>
           <div class="post-more-link text-center">
-            <a class="btn" href="/2016/08/12/redis-delete-big-keys/#more" rel="contents">
+            <a class="btn" href="/2016/08/12/redis-delete-large-keys/#more" rel="contents">
               阅读全文 &raquo;
             </a>
           </div>
