@@ -5,7 +5,7 @@
   <link href="/atom.xml" rel="self"/>
   
   <link href="http://yoursite.com/"/>
-  <updated>2016-08-15T12:03:42.000Z</updated>
+  <updated>2016-08-15T12:22:45.000Z</updated>
   <id>http://yoursite.com/</id>
   
   <author>
@@ -20,18 +20,17 @@
     <link href="http://yoursite.com/2016/08/14/redis-data-loss/"/>
     <id>http://yoursite.com/2016/08/14/redis-data-loss/</id>
     <published>2016-08-14T06:42:07.000Z</published>
-    <updated>2016-08-15T12:03:42.000Z</updated>
+    <updated>2016-08-15T12:22:45.000Z</updated>
     
     <content type="html"><![CDATA[<p>Redis大部分应用场景是纯缓存服务，请求后端有Primary Storage的组件,如MySQL,HBase;请求Redis的键未命中，会从primary Storage中获取数据返回，同时更新Redis缓存。<br>如果少量数据丢失，相当于请求”缓冲未命中“； 一般对业务的影响是无感知的。<br>但现在Redis用作存储的业务场景变多，数据丢失对业务是致命的影响。<br>本文简单讨论Redis常见数据”丢失“现象，以及怎么规避；会列举几个生产中有意思的情节。</p>
 <hr>
 <a id="more"></a>
 <h2 id="记1次Redis”数据丢失“的故障排查"><a href="#记1次Redis”数据丢失“的故障排查" class="headerlink" title="记1次Redis”数据丢失“的故障排查"></a>记1次Redis”数据丢失“的故障排查</h2><p>Redis数据被丢失问题，发生次数也很多； 如何快速定位问题和避免呢。<br>先分享一个小故事（大家都喜欢带情节的片，不对是技术文章）</p>
-<h3 id="情节：我的Redis掉了90000多个Keys-是不是DBA有删除操作？"><a href="#情节：我的Redis掉了90000多个Keys-是不是DBA有删除操作？" class="headerlink" title="情节：我的Redis掉了90000多个Keys, 是不是DBA有删除操作？"></a>情节：我的Redis掉了90000多个Keys, 是不是DBA有删除操作？</h3><p>(时间：12-04日；故事人物：RD(研发工程师)和DBA;  故事：Redis一夜之间不见90000个key）<br>RD：我们Redis集群中，以“t_list”前缀的90000多key今早发现都掉了，其他key都在，是不是DBA有清理操作啊？<br>  DBA：没有维护性操作(一脸懵B和无辜）, 先止损，把Key从Primary store中导入Redis；我先分析一下原因，有结果了通知你；定位问题前，你也关注一下，避免二次发生。<br>  RD：“已从MySQL把key导入到Redis.  好的，等你消息。”<br>然后RD就下楼了，DBA扣上他的25元的boss耳机，开始自言自语Troubleshooting.<br> “这部分key未设置TTL, 查看监控的 expired_keys基本都是0”<br> “是否达到了maxmeory，key被强制驱逐淘汰了？ 查看监控 used_memory_pct未到100%，查看 evicted_keys一直为0，最近24小时无key被淘汰”<br>“只是部分key丢失，而且都是同一个key前缀，说明这个凶手很了解业务；查看监控的实例总key数， keys指标，发现果断keys果断下降，但未变为0，排除Flushall/flushdb和Redis, 定位是程序或人为操作”<br>“如果程序主动删除key, 就只能是DEL操作，查看监控comdstat_del指标，表示每秒执行的Del次数，果然平时基本为0，昨晚22:01开始有每秒几十个的del”<br>“再查看slowlog, 22:01时，执行 ‘ KEYS t<em>list</em>*’ 的命令，获取这类key，进行批量清理”<br>这时问题定位了, 一首歌多的时间。 然后DBA通知RD排查的结论，让其他排查程序或人为操作；<br>分析证据简述如下：<br>从03日的Redis key监控可见，22:00到22：40这个数据key个数下降30000(1个分片，此集群共3个分片)<br>   <img src="/images/redis-data-loss/redis_keys.jpg" alt="redis_keys"></p>
-<p>03日22:00~22:40分之间，Redis的DEL操作大约12个，持续40min; 删除12<em>60</em>40约29000个key.（3个分片，共删除约90000个key)<br><img src="/images/redis-data-loss/redis_del.jpg" alt="redis_del"></p>
-<pre><code>查看slowlog监控，2015-12-03 22:01:01 时间点，执行KEYS  &quot;t_list_*&quot; 获取所有key的前缀， 目的应该是执行后面的DEL操作
-</code></pre><p><img src="/images/redis-data-loss/redis_slowlog.jpg" alt="redis_keys"></p>
+<h3 id="情节：我的Redis掉了90000多个Keys-是不是DBA有删除操作？"><a href="#情节：我的Redis掉了90000多个Keys-是不是DBA有删除操作？" class="headerlink" title="情节：我的Redis掉了90000多个Keys, 是不是DBA有删除操作？"></a>情节：我的Redis掉了90000多个Keys, 是不是DBA有删除操作？</h3><p>(时间：12-04日；故事人物：RD(研发工程师)和DBA;  故事：Redis一夜之间不见90000个key）</p>
 <blockquote>
-<p>说明：精细化的监控告警比较重要。 </p>
+<p>RD:我们Redis集群中，以“t_list”前缀的90000多key今早发现都掉了，其他key都在，是不是DBA有清理操作啊？<br>  DBA：没有维护性操作(一脸懵B和无辜),先止损，把Key从Primary store中导入Redis；我先分析一下原因，有结果了通知你；定位问题前，你也关注一下，避免二次发生。<br>  RD：“已从MySQL把key导入到Redis.  好的，等你消息。”<br>然后RD就下楼了，DBA扣上他的25元的boss耳机，开始自言自语Troubleshooting.<br> “这部分key未设置TTL, 查看监控的 expired_keys基本都是0”<br> “是否达到了maxmeory，key被强制驱逐淘汰了？ 查看监控 used_memory_pct未到100%，查看 evicted_keys一直为0，最近24小时无key被淘汰”<br>“只是部分key丢失，而且都是同一个key前缀，说明这个凶手很了解业务；查看监控的实例总key数， keys指标，发现果断keys果断下降，但未变为0，排除Flushall/flushdb和Redis, 定位是程序或人为操作”<br>“如果程序主动删除key, 就只能是DEL操作，查看监控comdstat_del指标，表示每秒执行的Del次数，果然平时基本为0，昨晚22:01开始有每秒几十个的del”<br>“再查看slowlog, 22:01时，执行 ‘ KEYS t<em>list</em>*’ 的命令，获取这类key，进行批量清理”<br>这时问题定位了, 一首歌多的时间。 然后DBA通知RD排查的结论，让其他排查程序或人为操作；</p>
+<p>分析证据简述如下：<br>从03日的Redis key监控可见，22:00到22：40这个数据key个数下降30000(1个分片，此集群共3个分片)<br>   <img src="/images/redis-data-loss/redis_keys.jpg" alt="redis_keys"><br>03日22:00~22:40分之间，Redis的DEL操作大约12个，持续40min; 删除12<em>60</em>40约29000个key.（3个分片，共删除约90000个key)<br><img src="/images/redis-data-loss/redis_del.jpg" alt="redis_del"><br>    查看slowlog监控，2015-12-03 22:01:01 时间点，执行KEYS  “t<em>list</em>*” 获取所有key的前缀， 目的应该是执行后面的DEL操作<br><img src="/images/redis-data-loss/redis_slowlog.jpg" alt="redis_keys"></p>
+<p>说明：精细化的监控告警很重要。 </p>
 </blockquote>
 <h2 id="数据丢失的影响"><a href="#数据丢失的影响" class="headerlink" title="数据丢失的影响"></a>数据丢失的影响</h2><ul>
 <li>Redis存储的应用场景，数据丢失是不能接受的;<br>因为Redis的持久化特性，数据还原很难保证一致性，因rdb全备和aof重写备份，RPO不能像MySQL这样保证恢复到故障操作的前一个事务。</li>
@@ -45,13 +44,12 @@
 <li>主从复制数据不一致，发生故障切换后，出现数据丢失</li>
 <li>大量过期键，同时被淘汰清理</li>
 </ul>
-<h3 id="程序bug或人为误操作"><a href="#程序bug或人为误操作" class="headerlink" title="程序bug或人为误操作"></a>程序bug或人为误操作</h3><p>如前文情节1，程序bug误删除数据； DBA/RD误操作执行flushall/flushdb这类命令。</p>
-<p>这类问题的预防和监控<br>1 重命令危险命令：keys(程度大批量误删除，很多通过keys获取键后再删除)，flushall，flushdb<br>2 细化几个重要的监控项：</p>
+<h3 id="程序bug或人为误操作"><a href="#程序bug或人为误操作" class="headerlink" title="程序bug或人为误操作"></a>程序bug或人为误操作</h3><p>如前文情节1，程序bug误删除数据； DBA/RD误操作执行flushall/flushdb这类命令。<br>这类问题的预防和监控<br>1 重命名危险命令：keys(程度大批量误删除，很多通过keys获取键后再删除)，flushall，flushdb<br>2 细化几个重要的监控项：</p>
 <ul>
 <li>实例当前的键个数(dbsize/info), 当大量键丢失时，可通过此项历史监控图，定位发生的时间范围</li>
 <li>各类删除命令的执行数监控：cmdtats_flushall, cmdstats_flushdb,cmdstat_del<br>对应时间范围，确认具体是什么操作</li>
 </ul>
-<h3 id="因客户端缓冲区内存使用过大，导致大量键被LRU淘汰"><a href="#因客户端缓冲区内存使用过大，导致大量键被LRU淘汰" class="headerlink" title="因客户端缓冲区内存使用过大，导致大量键被LRU淘汰"></a>因客户端缓冲区内存使用过大，导致大量键被LRU淘汰</h3><p>因客户端缓冲区的内存大小很难限制,它们消耗的内存数会计算在used_memory中；如果使用不当，<br>导致缓冲区内存使用过大，达到maxmemory限制；（缓存场景）会导致大量的键被淘汰，最坏会把所有键清理，缓冲无键可淘汰，写入失败。相当于整个缓冲失效，对业务影响较大。</p>
+<h3 id="因客户端缓冲区内存使用过大，导致大量键被LRU淘汰"><a href="#因客户端缓冲区内存使用过大，导致大量键被LRU淘汰" class="headerlink" title="因客户端缓冲区内存使用过大，导致大量键被LRU淘汰"></a>因客户端缓冲区内存使用过大，导致大量键被LRU淘汰</h3><p>因客户端缓冲区的内存大小很难限制,它们消耗的内存数会计算在used_memory内；如果使用不当，<br>导致缓冲区内存使用过大，达到maxmemory限制；（缓存场景）会导致大量的键被淘汰，最坏会把所有键清理，缓冲无键可淘汰，写入失败。相当于整个缓冲失效，对业务影响较大。</p>
 <blockquote>
 <p>关于Redis客户端缓冲区问题，详细分析见之前文章<a href="/2016/07/30/redis-client-two-buffers/" title="Redis Clients Two Buffers">Redis Clients Two Buffers</a></p>
 </blockquote>
@@ -71,7 +69,7 @@
 <p>建议：数据库这类重“状态性”服务，不建议程序暴力自动重启</p>
 </blockquote>
 <h3 id="网络分区的问题，导致短时间的写入数据丢失"><a href="#网络分区的问题，导致短时间的写入数据丢失" class="headerlink" title="网络分区的问题，导致短时间的写入数据丢失"></a>网络分区的问题，导致短时间的写入数据丢失</h3><p>这种问题出现丢失数据都很少，网络分区问题期间，Redis集群或哨兵在判断故障切换时，这段时间写入到原主库的数据，10来秒的写入量。这个场景的分析会复杂，<br>详细见Redis哨兵分析</p>
-<h3 id="主从复制数据不一致，发生故障切换后，出现数据丢失"><a href="#主从复制数据不一致，发生故障切换后，出现数据丢失" class="headerlink" title="主从复制数据不一致，发生故障切换后，出现数据丢失"></a>主从复制数据不一致，发生故障切换后，出现数据丢失</h3><p>主从数据出现不一致，发生故障切换，从库提升为主后，导致数据丢失的情况。<br>针对</p>
+<h3 id="主从复制数据不一致，发生故障切换后，出现数据丢失"><a href="#主从复制数据不一致，发生故障切换后，出现数据丢失" class="headerlink" title="主从复制数据不一致，发生故障切换后，出现数据丢失"></a>主从复制数据不一致，发生故障切换后，出现数据丢失</h3><p>主从数据出现不一致，发生故障切换，从库提升为主后，导致数据丢失的情况。<br>关于Redis复制数据不一致，请参考<a href="/2016/08/13/redis-replication-inconsistence/" title="Redis复制主从数据不-致">Redis复制主从数据不-致</a></p>
 <h3 id="大量过期键，同时被淘汰清理"><a href="#大量过期键，同时被淘汰清理" class="headerlink" title="大量过期键，同时被淘汰清理"></a>大量过期键，同时被淘汰清理</h3><p>这类情况不是真正的“数据丢失”，只是定期主动清理Redis堆积的过期键，会导致Redis的键个数(dbsize)出现陡降(最大能达20%）。业务方常误以为有数据丢失。</p>
 <p>这时可通过监控过期键淘汰的数量：expireed_keys的增长量，与dbsize键总数减少数据量是否相等。</p>
 <blockquote>
