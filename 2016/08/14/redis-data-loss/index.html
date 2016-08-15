@@ -92,7 +92,7 @@
 <meta property="og:url" content="http://yoursite.com/2016/08/14/redis-data-loss/index.html">
 <meta property="og:site_name" content="今天">
 <meta property="og:description" content="Redis大部分场景当作纯缓存使用，请求后端有Primary Storage的组件,如MySQL,HBase;请求Redis的键未命中，会从primary Storage中获取数据返回，同时更新Redis缓存。如果少量数据丢失，相当于请求”缓冲未命中“； 一般对业务的影响是无感知的。但现在Redis用作存储的业务场景变多，数据丢失对业务是致命的影响。本文简单讨论Redis常见数据”丢失“现象，以及">
-<meta property="og:updated_time" content="2016-08-15T10:54:55.000Z">
+<meta property="og:updated_time" content="2016-08-15T10:58:42.000Z">
 <meta name="twitter:card" content="summary">
 <meta name="twitter:title" content="Redis数据“丢失”情节版-草稿">
 <meta name="twitter:description" content="Redis大部分场景当作纯缓存使用，请求后端有Primary Storage的组件,如MySQL,HBase;请求Redis的键未命中，会从primary Storage中获取数据返回，同时更新Redis缓存。如果少量数据丢失，相当于请求”缓冲未命中“； 一般对业务的影响是无感知的。但现在Redis用作存储的业务场景变多，数据丢失对业务是致命的影响。本文简单讨论Redis常见数据”丢失“现象，以及">
@@ -361,7 +361,8 @@
 </blockquote>
 <h3 id="网络分区的问题，导致短时间的写入数据丢失"><a href="#网络分区的问题，导致短时间的写入数据丢失" class="headerlink" title="网络分区的问题，导致短时间的写入数据丢失"></a>网络分区的问题，导致短时间的写入数据丢失</h3><p>这种问题出现丢失数据都很少，网络分区问题期间，Redis集群或哨兵在判断故障切换时，这段时间写入到原主库的数据，10来秒的写入量。这个场景的分析会复杂，<br>详细见Redis哨兵分析</p>
 <h3 id="主从复制数据不一致，发生故障切换后，出现数据丢失"><a href="#主从复制数据不一致，发生故障切换后，出现数据丢失" class="headerlink" title="主从复制数据不一致，发生故障切换后，出现数据丢失"></a>主从复制数据不一致，发生故障切换后，出现数据丢失</h3><p>主从数据出现不一致，发生故障切换，从库提升为主后，导致数据丢失的情况。<br>针对</p>
-<h3 id="大量过期键，同时被淘汰清理"><a href="#大量过期键，同时被淘汰清理" class="headerlink" title="大量过期键，同时被淘汰清理"></a>大量过期键，同时被淘汰清理</h3><p>这类情况不是“数据丢失”，只是定期主动清理Redis堆积的过期键，会导致Redis的键个数(dbsize)出现陡降(高大能达20%）; 业务方常误以为</p>
+<h3 id="大量过期键，同时被淘汰清理"><a href="#大量过期键，同时被淘汰清理" class="headerlink" title="大量过期键，同时被淘汰清理"></a>大量过期键，同时被淘汰清理</h3><p>这类情况不是“数据丢失”，只是定期主动清理Redis堆积的过期键，会导致Redis的键个数(dbsize)出现陡降(最大能达20%）。业务方常误以为有数据丢失导致。</p>
+<p>这时可通过监控过期键淘汰的数量：expireed_keys的增长量，与dbsize键总数减少数据量是否相等。</p>
 <blockquote>
 <p>说明：关于过期键，大量堆积成为“死键”问题，详细分析参考<a href="/2016/08/05/redis-useless-keys/" title="Redis的“死键”问题">Redis的“死键”问题</a></p>
 </blockquote>
