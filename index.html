@@ -250,8 +250,8 @@
             
               
                 
-                <a class="post-title-link" href="/2016/08/12/redis-delete-large-keys/" itemprop="url">
-                  如何优雅地删除Redis大键
+                <a class="post-title-link" href="/2016/08/14/redis-data-loss/" itemprop="url">
+                  Redis数据“丢失”情节版-草稿
                 </a>
               
             
@@ -264,8 +264,8 @@
               <i class="fa fa-calendar-o"></i>
             </span>
             <span class="post-meta-item-text">发表于</span>
-            <time itemprop="dateCreated" datetime="2016-08-12T18:43:41+08:00" content="2016-08-12">
-              2016-08-12
+            <time itemprop="dateCreated" datetime="2016-08-14T14:42:07+08:00" content="2016-08-14">
+              2016-08-14
             </time>
           </span>
 
@@ -294,8 +294,254 @@
             
               <span class="post-comments-count">
                 &nbsp; | &nbsp;
-                <a href="/2016/08/12/redis-delete-large-keys/#comments" itemprop="discussionUrl">
-                  <span class="post-comments-count ds-thread-count" data-thread-key="2016/08/12/redis-delete-large-keys/" itemprop="commentsCount"></span>
+                <a href="/2016/08/14/redis-data-loss/#comments" itemprop="discussionUrl">
+                  <span class="post-comments-count ds-thread-count" data-thread-key="2016/08/14/redis-data-loss/" itemprop="commentsCount"></span>
+                </a>
+              </span>
+            
+          
+
+          
+
+          
+          
+
+          
+        </div>
+      </header>
+    
+
+
+    <div class="post-body" itemprop="articleBody">
+
+      
+      
+
+      
+        
+          <p>Redis大部分场景当作纯缓存使用，请求后端有Primary Storage的组件,如MySQL,HBase;请求Redis的键未命中，会从primary Storage中获取数据返回，同时更新Redis缓存。<br>如果少量数据丢失，相当于请求”缓冲未命中“； 一般对业务的影响是无感知的。<br>但现在Redis用作存储的业务场景变多，数据丢失对业务是致命的影响。<br>本文简单讨论Redis常见数据”丢失“现象，以及怎么规避；会列举几个生产中有意思的情节。</p>
+<hr>
+          <div class="post-more-link text-center">
+            <a class="btn" href="/2016/08/14/redis-data-loss/#more" rel="contents">
+              阅读全文 &raquo;
+            </a>
+          </div>
+        
+      
+    </div>
+
+    <div>
+      
+    </div>
+
+    <div>
+      
+    </div>
+
+    <footer class="post-footer">
+      
+
+      
+
+      
+      
+        <div class="post-eof"></div>
+      
+    </footer>
+  </article>
+
+
+    
+      
+
+  
+  
+
+  
+  
+  
+
+  <article class="post post-type-normal " itemscope itemtype="http://schema.org/Article">
+
+    
+      <header class="post-header">
+
+        
+        
+          <h1 class="post-title" itemprop="name headline">
+            
+            
+              
+                
+                <a class="post-title-link" href="/2016/08/13/redis-replication-inconsistence/" itemprop="url">
+                  Redis复制数据不-致
+                </a>
+              
+            
+          </h1>
+        
+
+        <div class="post-meta">
+          <span class="post-time">
+            <span class="post-meta-item-icon">
+              <i class="fa fa-calendar-o"></i>
+            </span>
+            <span class="post-meta-item-text">发表于</span>
+            <time itemprop="dateCreated" datetime="2016-08-13T15:49:38+08:00" content="2016-08-13">
+              2016-08-13
+            </time>
+          </span>
+
+          
+            <span class="post-category" >
+              &nbsp; | &nbsp;
+              <span class="post-meta-item-icon">
+                <i class="fa fa-folder-o"></i>
+              </span>
+              <span class="post-meta-item-text">分类于</span>
+              
+                <span itemprop="about" itemscope itemtype="https://schema.org/Thing">
+                  <a href="/categories/Redis/" itemprop="url" rel="index">
+                    <span itemprop="name">Redis</span>
+                  </a>
+                </span>
+
+                
+                
+
+              
+            </span>
+          
+
+          
+            
+              <span class="post-comments-count">
+                &nbsp; | &nbsp;
+                <a href="/2016/08/13/redis-replication-inconsistence/#comments" itemprop="discussionUrl">
+                  <span class="post-comments-count ds-thread-count" data-thread-key="2016/08/13/redis-replication-inconsistence/" itemprop="commentsCount"></span>
+                </a>
+              </span>
+            
+          
+
+          
+
+          
+          
+
+          
+        </div>
+      </header>
+    
+
+
+    <div class="post-body" itemprop="articleBody">
+
+      
+      
+
+      
+        
+          <p>很多常见的数据库，都采用逻辑异步(半同步)的方式复制，数据是最终一致性的；这就可能导致复制主从的数据不一致。而对MySQL这种关系数据库，如果复制数据出现不一致，这种故障对业务而言，往往是影响极大的。<br>Redis的缓存场景来说，主从数据不一致或丢失，其对业务影响都很小，一般不被大家所重视。<br>随着Redis用于存储场景越来越多，数据量也越大；这就使保证Redis复制数据一致会比较重要。<br>本文简单讨论Redis复制数据不一致性的影响、常见故障场景和如何避免等</p>
+<hr>
+          <div class="post-more-link text-center">
+            <a class="btn" href="/2016/08/13/redis-replication-inconsistence/#more" rel="contents">
+              阅读全文 &raquo;
+            </a>
+          </div>
+        
+      
+    </div>
+
+    <div>
+      
+    </div>
+
+    <div>
+      
+    </div>
+
+    <footer class="post-footer">
+      
+
+      
+
+      
+      
+        <div class="post-eof"></div>
+      
+    </footer>
+  </article>
+
+
+    
+      
+
+  
+  
+
+  
+  
+  
+
+  <article class="post post-type-normal " itemscope itemtype="http://schema.org/Article">
+
+    
+      <header class="post-header">
+
+        
+        
+          <h1 class="post-title" itemprop="name headline">
+            
+            
+              
+                
+                <a class="post-title-link" href="/2016/08/13/redis-delete-large-keys/" itemprop="url">
+                  如何优雅地删除Redis大键
+                </a>
+              
+            
+          </h1>
+        
+
+        <div class="post-meta">
+          <span class="post-time">
+            <span class="post-meta-item-icon">
+              <i class="fa fa-calendar-o"></i>
+            </span>
+            <span class="post-meta-item-text">发表于</span>
+            <time itemprop="dateCreated" datetime="2016-08-13T14:43:41+08:00" content="2016-08-13">
+              2016-08-13
+            </time>
+          </span>
+
+          
+            <span class="post-category" >
+              &nbsp; | &nbsp;
+              <span class="post-meta-item-icon">
+                <i class="fa fa-folder-o"></i>
+              </span>
+              <span class="post-meta-item-text">分类于</span>
+              
+                <span itemprop="about" itemscope itemtype="https://schema.org/Thing">
+                  <a href="/categories/Redis/" itemprop="url" rel="index">
+                    <span itemprop="name">Redis</span>
+                  </a>
+                </span>
+
+                
+                
+
+              
+            </span>
+          
+
+          
+            
+              <span class="post-comments-count">
+                &nbsp; | &nbsp;
+                <a href="/2016/08/13/redis-delete-large-keys/#comments" itemprop="discussionUrl">
+                  <span class="post-comments-count ds-thread-count" data-thread-key="2016/08/13/redis-delete-large-keys/" itemprop="commentsCount"></span>
                 </a>
               </span>
             
@@ -323,9 +569,9 @@
 <blockquote>
 <p>1个大小200MB的String键(String Object最大512MB)；内存空间角度占用较大<br>  1个包含100000000(1kw)个字段的Hash键，对应访问模式(如hgetall)时间复杂度高</p>
 </blockquote>
-<p>因为内存空间复杂性处理耗时都非常小，测试 del 200MB String键耗时约1毫秒，<br>而删除一个含有1kw个字段的Hash键，却会阻塞Redis进程数十秒。所以本文只从时间复杂度分析大的集合类键。删除这种大键的风险，以及怎么优雅地删除。</p>
+<p>因为内存空间复杂性处理耗时都非常小，测试 del 200MB String键耗时约1毫秒，<br>而删除一个含有1kw个字段的Hash键，却会阻塞Redis进程十余秒。所以本文只从时间复杂度分析大的集合类键。删除这种大键的风险，以及怎么优雅地删除。</p>
           <div class="post-more-link text-center">
-            <a class="btn" href="/2016/08/12/redis-delete-large-keys/#more" rel="contents">
+            <a class="btn" href="/2016/08/13/redis-delete-large-keys/#more" rel="contents">
               阅读全文 &raquo;
             </a>
           </div>
@@ -1134,7 +1380,7 @@
         <nav class="site-state motion-element">
           <div class="site-state-item site-state-posts">
             <a href="/archives">
-              <span class="site-state-item-count">7</span>
+              <span class="site-state-item-count">9</span>
               <span class="site-state-item-name">日志</span>
             </a>
           </div>

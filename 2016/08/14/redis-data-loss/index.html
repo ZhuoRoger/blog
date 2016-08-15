@@ -1,0 +1,751 @@
+<!doctype html>
+
+
+
+  
+
+
+<html class="theme-next mist use-motion">
+<head>
+  <meta charset="UTF-8"/>
+<meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1"/>
+
+
+
+<meta http-equiv="Cache-Control" content="no-transform" />
+<meta http-equiv="Cache-Control" content="no-siteapp" />
+
+
+
+
+
+
+
+
+
+
+
+
+  
+  
+  <link href="/vendors/fancybox/source/jquery.fancybox.css?v=2.1.5" rel="stylesheet" type="text/css" />
+
+
+
+
+  
+  
+  
+  
+
+  
+    
+    
+  
+
+  
+
+  
+
+  
+
+  
+
+  
+    
+    
+    <link href="//fonts.googleapis.com/css?family=Lato:300,300italic,400,400italic,700,700italic&subset=latin,latin-ext" rel="stylesheet" type="text/css">
+  
+
+
+
+
+
+
+<link href="/vendors/font-awesome/css/font-awesome.min.css?v=4.4.0" rel="stylesheet" type="text/css" />
+
+<link href="/css/main.css?v=5.0.1" rel="stylesheet" type="text/css" />
+
+
+  <meta name="keywords" content="Redis," />
+
+
+
+
+
+  <link rel="alternate" href="/atom.xml" title="今天" type="application/atom+xml" />
+
+
+
+
+  <link rel="shortcut icon" type="image/x-icon" href="/favicon.ico?v=5.0.1" />
+
+
+
+
+
+
+<meta name="description" content="Redis大部分场景当作纯缓存使用，请求后端有Primary Storage的组件,如MySQL,HBase;请求Redis的键未命中，会从primary Storage中获取数据返回，同时更新Redis缓存。如果少量数据丢失，相当于请求”缓冲未命中“； 一般对业务的影响是无感知的。但现在Redis用作存储的业务场景变多，数据丢失对业务是致命的影响。本文简单讨论Redis常见数据”丢失“现象，以及">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Redis数据“丢失”情节版-草稿">
+<meta property="og:url" content="http://yoursite.com/2016/08/14/redis-data-loss/index.html">
+<meta property="og:site_name" content="今天">
+<meta property="og:description" content="Redis大部分场景当作纯缓存使用，请求后端有Primary Storage的组件,如MySQL,HBase;请求Redis的键未命中，会从primary Storage中获取数据返回，同时更新Redis缓存。如果少量数据丢失，相当于请求”缓冲未命中“； 一般对业务的影响是无感知的。但现在Redis用作存储的业务场景变多，数据丢失对业务是致命的影响。本文简单讨论Redis常见数据”丢失“现象，以及">
+<meta property="og:updated_time" content="2016-08-15T10:36:21.000Z">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="Redis数据“丢失”情节版-草稿">
+<meta name="twitter:description" content="Redis大部分场景当作纯缓存使用，请求后端有Primary Storage的组件,如MySQL,HBase;请求Redis的键未命中，会从primary Storage中获取数据返回，同时更新Redis缓存。如果少量数据丢失，相当于请求”缓冲未命中“； 一般对业务的影响是无感知的。但现在Redis用作存储的业务场景变多，数据丢失对业务是致命的影响。本文简单讨论Redis常见数据”丢失“现象，以及">
+
+
+
+<script type="text/javascript" id="hexo.configuration">
+  var NexT = window.NexT || {};
+  var CONFIG = {
+    scheme: 'Mist',
+    sidebar: {"position":"left","display":"always"},
+    fancybox: true,
+    motion: true,
+    duoshuo: {
+      userId: 6316444262204442000,
+      author: '今天'
+    }
+  };
+</script>
+
+
+
+
+  <link rel="canonical" href="http://yoursite.com/2016/08/14/redis-data-loss/"/>
+
+  <title> Redis数据“丢失”情节版-草稿 | 今天 </title>
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage" lang="zh-Hans">
+
+  
+
+
+
+
+
+
+
+
+
+
+  
+  
+    
+  
+
+  <div class="container one-collumn sidebar-position-left page-post-detail ">
+    <div class="headband"></div>
+
+    <header id="header" class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-meta ">
+  
+
+  <div class="custom-logo-site-title">
+    <a href="/"  class="brand" rel="start">
+      <span class="logo-line-before"><i></i></span>
+      <span class="site-title">今天</span>
+      <span class="logo-line-after"><i></i></span>
+    </a>
+  </div>
+  <p class="site-subtitle"></p>
+</div>
+
+<div class="site-nav-toggle">
+  <button>
+    <span class="btn-bar"></span>
+    <span class="btn-bar"></span>
+    <span class="btn-bar"></span>
+  </button>
+</div>
+
+<nav class="site-nav">
+  
+
+  
+    <ul id="menu" class="menu">
+      
+        
+        <li class="menu-item menu-item-home">
+          <a href="/" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-home"></i> <br />
+            
+            首页
+          </a>
+        </li>
+      
+        
+        <li class="menu-item menu-item-categories">
+          <a href="/categories" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-th"></i> <br />
+            
+            分类
+          </a>
+        </li>
+      
+        
+        <li class="menu-item menu-item-archives">
+          <a href="/archives" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-archive"></i> <br />
+            
+            归档
+          </a>
+        </li>
+      
+        
+        <li class="menu-item menu-item-books">
+          <a href="/books" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-heartbeat"></i> <br />
+            
+            书单
+          </a>
+        </li>
+      
+
+      
+    </ul>
+  
+
+  
+</nav>
+
+ </div>
+    </header>
+
+    <main id="main" class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          <div id="content" class="content">
+            
+
+  <div id="posts" class="posts-expand">
+    
+
+  
+  
+
+  
+  
+  
+
+  <article class="post post-type-normal " itemscope itemtype="http://schema.org/Article">
+
+    
+      <header class="post-header">
+
+        
+        
+          <h1 class="post-title" itemprop="name headline">
+            
+            
+              
+                Redis数据“丢失”情节版-草稿
+              
+            
+          </h1>
+        
+
+        <div class="post-meta">
+          <span class="post-time">
+            <span class="post-meta-item-icon">
+              <i class="fa fa-calendar-o"></i>
+            </span>
+            <span class="post-meta-item-text">发表于</span>
+            <time itemprop="dateCreated" datetime="2016-08-14T14:42:07+08:00" content="2016-08-14">
+              2016-08-14
+            </time>
+          </span>
+
+          
+            <span class="post-category" >
+              &nbsp; | &nbsp;
+              <span class="post-meta-item-icon">
+                <i class="fa fa-folder-o"></i>
+              </span>
+              <span class="post-meta-item-text">分类于</span>
+              
+                <span itemprop="about" itemscope itemtype="https://schema.org/Thing">
+                  <a href="/categories/Redis/" itemprop="url" rel="index">
+                    <span itemprop="name">Redis</span>
+                  </a>
+                </span>
+
+                
+                
+
+              
+            </span>
+          
+
+          
+            
+              <span class="post-comments-count">
+                &nbsp; | &nbsp;
+                <a href="/2016/08/14/redis-data-loss/#comments" itemprop="discussionUrl">
+                  <span class="post-comments-count ds-thread-count" data-thread-key="2016/08/14/redis-data-loss/" itemprop="commentsCount"></span>
+                </a>
+              </span>
+            
+          
+
+          
+
+          
+          
+
+          
+              &nbsp; | &nbsp;
+              <span class="page-pv"><i class="fa fa-file-o"></i>
+              <span class="busuanzi-value" id="busuanzi_value_page_pv" ></span>
+              </span>
+          
+        </div>
+      </header>
+    
+
+
+    <div class="post-body" itemprop="articleBody">
+
+      
+      
+
+      
+        <p>Redis大部分场景当作纯缓存使用，请求后端有Primary Storage的组件,如MySQL,HBase;请求Redis的键未命中，会从primary Storage中获取数据返回，同时更新Redis缓存。<br>如果少量数据丢失，相当于请求”缓冲未命中“； 一般对业务的影响是无感知的。<br>但现在Redis用作存储的业务场景变多，数据丢失对业务是致命的影响。<br>本文简单讨论Redis常见数据”丢失“现象，以及怎么规避；会列举几个生产中有意思的情节。</p>
+<hr>
+<a id="more"></a>
+<h2 id="记几次Redis”数据丢失“的故障排查"><a href="#记几次Redis”数据丢失“的故障排查" class="headerlink" title="记几次Redis”数据丢失“的故障排查"></a>记几次Redis”数据丢失“的故障排查</h2><h3 id="情节1："><a href="#情节1：" class="headerlink" title="情节1："></a>情节1：</h3><h3 id="情节2"><a href="#情节2" class="headerlink" title="情节2:"></a>情节2:</h3><h3 id="情节3："><a href="#情节3：" class="headerlink" title="情节3："></a>情节3：</h3><h2 id="数据丢失的影响"><a href="#数据丢失的影响" class="headerlink" title="数据丢失的影响"></a>数据丢失的影响</h2><ul>
+<li>对存储应用场景，数据丢失是不能接受的</li>
+<li>对于缓存的应用场景，如果大量缓存数据丢失，往往导致后端存储组件”打死“，应用程序雪崩的情况</li>
+</ul>
+<h2 id="常见Redis数据丢失的情况"><a href="#常见Redis数据丢失的情况" class="headerlink" title="常见Redis数据丢失的情况"></a>常见Redis数据丢失的情况</h2><ul>
+<li>程序bug或人为误操作</li>
+<li>因客户端缓冲区内存使用过大，导致大量键被LRU淘汰</li>
+<li>主库故障后自动重启，可能导致数据丢失</li>
+<li>网络分区的问题，导致短时间的写入数据丢失（详细讨论，参考哨兵的数据丢失问题讨论）</li>
+<li>主从复制数据不一致，发生故障切换后，出现数据丢失</li>
+<li>大量键过期，触发主动清理</li>
+</ul>
+<h3 id="程序bug或人为误操作"><a href="#程序bug或人为误操作" class="headerlink" title="程序bug或人为误操作"></a>程序bug或人为误操作</h3><p>如前文情节1，程序bug误删除数据； DBA/RD误操作执行flushall/flushdb这类命令。</p>
+<p>这类问题的预防和监控<br>1 重命令危险命令：keys(程度大批量误删除，很多通过keys获取键后再删除)，flushall，flushdb<br>2 细化几个重要的监控项：</p>
+<ul>
+<li>实例当前的键个数(dbsize/info), 当大量键丢失时，可通过此项历史监控图，定位发生的时间范围</li>
+<li>各类删除命令的执行数监控：cmdtats_flushall, cmdstats_flushdb,cmdstat_del<br>对应时间范围，确认具体是什么操作</li>
+</ul>
+<h3 id="因客户端缓冲区内存使用过大，导致大量键被LRU淘汰"><a href="#因客户端缓冲区内存使用过大，导致大量键被LRU淘汰" class="headerlink" title="因客户端缓冲区内存使用过大，导致大量键被LRU淘汰"></a>因客户端缓冲区内存使用过大，导致大量键被LRU淘汰</h3><p>因客户端缓冲区的内存大小很难限制,它们消耗的内存数会计算在used_memory中；如果使用不当，<br>导致缓冲区内存使用过大，达到maxmemory限制；（缓存场景）会导致大量的键被淘汰，最坏会把所有键清理，缓冲无键可淘汰，写入失败。相当于整个缓冲失效，对业务影响较大。</p>
+<blockquote>
+<p>关于Redis客户端缓冲区问题，详细分析见之前文章<a href="/2016/07/30/redis-client-two-buffers/" title="Redis Clients Two Buffers">Redis Clients Two Buffers</a></p>
+</blockquote>
+<p>这类问题的预防和监控：<br>1 业务容量规划时把缓冲正常消耗计算在内，合理高大maxmemory的限制；<br>每个实例最好可预留几百M(大小根据客户端连接数和key的使用有关，根据大小集群合理调整)<br>2 对输出缓冲区设置合理limit；如normal设置10MB, SLAVE设置1GB等。 如果复制因slave线程输出缓冲区反复同步，需临时调大slave client-output-buffer，要同时调大maxmemory限制。</p>
+<blockquote>
+<p>说明：关于Redis复制中断和无限同步，详细分析请见<a href="/2016/07/31/redis-replication-broken-and-loopsync/" title="Redis复制中断和无限同步问题">Redis复制中断和无限同步问题</a></p>
+</blockquote>
+<p>3 主要监控</p>
+<ul>
+<li>监控内存使用大小 used_memory</li>
+<li>监控两个buffer的使用量client_longest_output_list和client_biggest_input_buf</li>
+<li>监控键的LRU驱逐数量：evicted_keys </li>
+</ul>
+<h3 id="主库故障后自动重启，可能导致数据全部丢失"><a href="#主库故障后自动重启，可能导致数据全部丢失" class="headerlink" title="主库故障后自动重启，可能导致数据全部丢失"></a>主库故障后自动重启，可能导致数据全部丢失</h3><p>这种故障发生，极有可能数据全部丢失。<br>问题发生的现象：时间点T1,主库故障关闭了，因设置有自动重启的守护程序，时间点T2主库被重新拉起，因(T2-T1)时间间隔过小，未达到Redis集群或哨兵的主从切换判断时长；这样从库发现主库runid变了或断开过，会全量同步主库rdb清理，并清理自己的数据。<br>而为保障性能,Redis主库往往不做数据持久化设置，那么时间点T2启动的主库，很有可能是个空实例（或很久前的rdb文件）。</p>
+<p>这种问题发生时间间隔，一般小于1分钟，可能监控告警无法感知到。<br>这类总是的预防和监控：<br>1 强烈反对Redis粗暴地设置自动重启<br>2 这种监控键个数的变化，缓存命中率，同时ELK类型准实时监控redis日志变化并告警</p>
+<blockquote>
+<p>建议：数据库这类重“状态性”服务，不建议程序暴力自动重启</p>
+</blockquote>
+<h3 id="网络分区的问题，导致短时间的写入数据丢失"><a href="#网络分区的问题，导致短时间的写入数据丢失" class="headerlink" title="网络分区的问题，导致短时间的写入数据丢失"></a>网络分区的问题，导致短时间的写入数据丢失</h3><p>这种问题出现丢失数据都很少，网络分区问题期间，Redis集群或哨兵在判断故障切换时，这段时间写入到原主库的数据，10来秒的写入量。这个场景的分析会复杂，<br>详细见Redis哨兵分析</p>
+<h3 id="主从复制数据不一致，发生故障切换后，出现数据丢失"><a href="#主从复制数据不一致，发生故障切换后，出现数据丢失" class="headerlink" title="主从复制数据不一致，发生故障切换后，出现数据丢失"></a>主从复制数据不一致，发生故障切换后，出现数据丢失</h3><p>主从数据出现不一致，发生故障切换，从库提升为主后，导致数据丢失的情况。<br>针对</p>
+<h2 id="数据“丢失”问题排查"><a href="#数据“丢失”问题排查" class="headerlink" title="数据“丢失”问题排查"></a>数据“丢失”问题排查</h2>
+      
+    </div>
+
+    <div>
+      
+        
+
+      
+    </div>
+
+    <div>
+      
+        
+
+      
+    </div>
+
+    <footer class="post-footer">
+      
+        <div class="post-tags">
+          
+            <a href="/tags/Redis/" rel="tag">#Redis</a>
+          
+        </div>
+      
+
+      
+        <div class="post-nav">
+          <div class="post-nav-next post-nav-item">
+            
+              <a href="/2016/08/13/redis-replication-inconsistence/" rel="next" title="Redis复制数据不-致">
+                <i class="fa fa-chevron-left"></i> Redis复制数据不-致
+              </a>
+            
+          </div>
+
+          <div class="post-nav-prev post-nav-item">
+            
+          </div>
+        </div>
+      
+
+      
+      
+    </footer>
+  </article>
+
+
+
+    <div class="post-spread">
+      
+        <!-- JiaThis Button BEGIN -->
+<div class="jiathis_style">
+  <a class="jiathis_button_tsina"></a>
+  <a class="jiathis_button_tqq"></a>
+  <a class="jiathis_button_weixin"></a>
+  <a class="jiathis_button_cqq"></a>
+  <a class="jiathis_button_douban"></a>
+  <a class="jiathis_button_renren"></a>
+  <a class="jiathis_button_qzone"></a>
+  <a class="jiathis_button_kaixin001"></a>
+  <a class="jiathis_button_copy"></a>
+  <a href="http://www.jiathis.com/share" class="jiathis jiathis_txt jiathis_separator jtico jtico_jiathis" target="_blank"></a>
+  <a class="jiathis_counter_style"></a>
+</div>
+<script type="text/javascript" >
+  var jiathis_config={
+    hideMore:false
+  }
+</script>
+<script type="text/javascript" src="http://v3.jiathis.com/code/jia.js" charset="utf-8"></script>
+<!-- JiaThis Button END -->
+
+      
+    </div>
+  </div>
+
+
+          </div>
+          
+
+
+          
+  <div class="comments" id="comments">
+    
+      <div class="ds-thread" data-thread-key="2016/08/14/redis-data-loss/"
+           data-title="Redis数据“丢失”情节版-草稿" data-url="http://yoursite.com/2016/08/14/redis-data-loss/">
+      </div>
+    
+  </div>
+
+
+        </div>
+        
+          
+  
+  <div class="sidebar-toggle">
+    <div class="sidebar-toggle-line-wrap">
+      <span class="sidebar-toggle-line sidebar-toggle-line-first"></span>
+      <span class="sidebar-toggle-line sidebar-toggle-line-middle"></span>
+      <span class="sidebar-toggle-line sidebar-toggle-line-last"></span>
+    </div>
+  </div>
+
+  <aside id="sidebar" class="sidebar">
+    <div class="sidebar-inner">
+
+      
+
+      
+        <ul class="sidebar-nav motion-element">
+          <li class="sidebar-nav-toc sidebar-nav-active" data-target="post-toc-wrap" >
+            文章目录
+          </li>
+          <li class="sidebar-nav-overview" data-target="site-overview">
+            站点概览
+          </li>
+        </ul>
+      
+
+      <section class="site-overview sidebar-panel ">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+          <img class="site-author-image" itemprop="image"
+               src="/uploads/avatar.jpg"
+               alt="Roger Zhuo" />
+          <p class="site-author-name" itemprop="name">Roger Zhuo</p>
+          <p class="site-description motion-element" itemprop="description">汝林的Blog</p>
+        </div>
+        <nav class="site-state motion-element">
+          <div class="site-state-item site-state-posts">
+            <a href="/archives">
+              <span class="site-state-item-count">9</span>
+              <span class="site-state-item-name">日志</span>
+            </a>
+          </div>
+
+          
+            <div class="site-state-item site-state-categories">
+              <a href="/categories">
+                <span class="site-state-item-count">2</span>
+                <span class="site-state-item-name">分类</span>
+              </a>
+            </div>
+          
+
+          
+            <div class="site-state-item site-state-tags">
+              
+                <span class="site-state-item-count">3</span>
+                <span class="site-state-item-name">标签</span>
+              
+            </div>
+          
+
+        </nav>
+
+        
+          <div class="feed-link motion-element">
+            <a href="/atom.xml" rel="alternate">
+              <i class="fa fa-rss"></i>
+              RSS
+            </a>
+          </div>
+        
+
+        <div class="links-of-author motion-element">
+          
+            
+              <span class="links-of-author-item">
+                <a href="https://github.com/ZhuoRoger" target="_blank" title="GitHub">
+                  
+                    <i class="fa fa-fw fa-github"></i>
+                  
+                  GitHub
+                </a>
+              </span>
+            
+              <span class="links-of-author-item">
+                <a href="http://weibo.com/2540962412" target="_blank" title="微博">
+                  
+                    <i class="fa fa-fw fa-globe"></i>
+                  
+                  微博
+                </a>
+              </span>
+            
+          
+        </div>
+
+        
+        
+
+        
+        
+          <div class="links-of-blogroll motion-element links-of-blogroll-inline">
+            <div class="links-of-blogroll-title">
+              <i class="fa  fa-fw fa-globe"></i>
+              
+            </div>
+            <ul class="links-of-blogroll-list">
+              
+                <li class="links-of-blogroll-item">
+                  <a href="https://www.percona.com/blog/" title="Percona" target="_blank">Percona</a>
+                </li>
+              
+            </ul>
+          </div>
+        
+
+      </section>
+
+      
+        <section class="post-toc-wrap motion-element sidebar-panel sidebar-panel-active">
+          <div class="post-toc">
+            
+              
+            
+            
+              <div class="post-toc-content"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#记几次Redis”数据丢失“的故障排查"><span class="nav-number">1.</span> <span class="nav-text">记几次Redis”数据丢失“的故障排查</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#情节1："><span class="nav-number">1.1.</span> <span class="nav-text">情节1：</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#情节2"><span class="nav-number">1.2.</span> <span class="nav-text">情节2:</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#情节3："><span class="nav-number">1.3.</span> <span class="nav-text">情节3：</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#数据丢失的影响"><span class="nav-number">2.</span> <span class="nav-text">数据丢失的影响</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#常见Redis数据丢失的情况"><span class="nav-number">3.</span> <span class="nav-text">常见Redis数据丢失的情况</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#程序bug或人为误操作"><span class="nav-number">3.1.</span> <span class="nav-text">程序bug或人为误操作</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#因客户端缓冲区内存使用过大，导致大量键被LRU淘汰"><span class="nav-number">3.2.</span> <span class="nav-text">因客户端缓冲区内存使用过大，导致大量键被LRU淘汰</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#主库故障后自动重启，可能导致数据全部丢失"><span class="nav-number">3.3.</span> <span class="nav-text">主库故障后自动重启，可能导致数据全部丢失</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#网络分区的问题，导致短时间的写入数据丢失"><span class="nav-number">3.4.</span> <span class="nav-text">网络分区的问题，导致短时间的写入数据丢失</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#主从复制数据不一致，发生故障切换后，出现数据丢失"><span class="nav-number">3.5.</span> <span class="nav-text">主从复制数据不一致，发生故障切换后，出现数据丢失</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#数据“丢失”问题排查"><span class="nav-number">4.</span> <span class="nav-text">数据“丢失”问题排查</span></a></li></ol></div>
+            
+          </div>
+        </section>
+      
+
+    </div>
+  </aside>
+
+
+        
+      </div>
+    </main>
+
+    <footer id="footer" class="footer">
+      <div class="footer-inner">
+        <div class="copyright" >
+  
+  &copy; 
+  <span itemprop="copyrightYear">2016</span>
+  <span class="with-love">
+    <i class="fa fa-heart"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">Roger Zhuo</span>
+</div>
+
+<div class="powered-by">
+  由 <a class="theme-link" href="https://hexo.io">Hexo</a> 强力驱动
+</div>
+
+<div class="theme-info">
+  主题 -
+  <a class="theme-link" href="https://github.com/iissnan/hexo-theme-next">
+    NexT.Mist
+  </a>
+</div>
+
+        
+
+<div class="busuanzi-count">
+
+  <script async src="https://dn-lbstatics.qbox.me/busuanzi/2.3/busuanzi.pure.mini.js"></script>
+
+  
+    <span class="site-uv"><i class="fa fa-user"></i><span class="busuanzi-value" id="busuanzi_value_site_uv"></span></span>
+  
+
+  
+    <span class="site-pv"><i class="fa fa-eye"></i><span class="busuanzi-value" id="busuanzi_value_site_pv"></span></span>
+  
+  
+</div>
+
+
+
+        
+      </div>
+    </footer>
+
+    <div class="back-to-top">
+      <i class="fa fa-arrow-up"></i>
+    </div>
+  </div>
+
+  
+
+<script type="text/javascript">
+  if (Object.prototype.toString.call(window.Promise) !== '[object Function]') {
+    window.Promise = null;
+  }
+</script>
+
+
+
+
+
+
+
+
+
+  
+
+
+
+  
+  <script type="text/javascript" src="/vendors/jquery/index.js?v=2.1.3"></script>
+
+  
+  <script type="text/javascript" src="/vendors/fastclick/lib/fastclick.min.js?v=1.0.6"></script>
+
+  
+  <script type="text/javascript" src="/vendors/jquery_lazyload/jquery.lazyload.js?v=1.9.7"></script>
+
+  
+  <script type="text/javascript" src="/vendors/velocity/velocity.min.js?v=1.2.1"></script>
+
+  
+  <script type="text/javascript" src="/vendors/velocity/velocity.ui.min.js?v=1.2.1"></script>
+
+  
+  <script type="text/javascript" src="/vendors/fancybox/source/jquery.fancybox.pack.js?v=2.1.5"></script>
+
+
+  
+
+
+  <script type="text/javascript" src="/js/src/utils.js?v=5.0.1"></script>
+
+  <script type="text/javascript" src="/js/src/motion.js?v=5.0.1"></script>
+
+
+
+  
+  
+
+  
+  <script type="text/javascript" src="/js/src/scrollspy.js?v=5.0.1"></script>
+<script type="text/javascript" src="/js/src/post-details.js?v=5.0.1"></script>
+
+
+
+  
+
+
+  <script type="text/javascript" src="/js/src/bootstrap.js?v=5.0.1"></script>
+
+
+
+  
+
+  
+    
+  
+
+  <script type="text/javascript">
+    var duoshuoQuery = {short_name:"rogerzhuo"};
+    (function() {
+      var ds = document.createElement('script');
+      ds.type = 'text/javascript';ds.async = true;
+      ds.id = 'duoshuo-script';
+      ds.src = (document.location.protocol == 'https:' ? 'https:' : 'http:') + '//static.duoshuo.com/embed.js';
+      ds.charset = 'UTF-8';
+      (document.getElementsByTagName('head')[0]
+      || document.getElementsByTagName('body')[0]).appendChild(ds);
+    })();
+  </script>
+
+  
+    
+    <script src="/vendors/ua-parser-js/dist/ua-parser.min.js?v=0.7.9"></script>
+    <script src="/js/src/hook-duoshuo.js"></script>
+  
+
+
+
+
+
+
+  
+  
+
+  
+
+  
+
+  
+
+</body>
+</html>
