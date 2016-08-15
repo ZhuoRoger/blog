@@ -450,7 +450,7 @@
     <link href="http://yoursite.com/2016/07/31/redis-replication-broken-and-loopsync/"/>
     <id>http://yoursite.com/2016/07/31/redis-replication-broken-and-loopsync/</id>
     <published>2016-07-31T10:33:33.000Z</published>
-    <updated>2016-08-11T12:12:50.000Z</updated>
+    <updated>2016-08-15T13:15:05.000Z</updated>
     
     <content type="html"><![CDATA[<p>很多常见数据库(含NoSQL)都用复制技术的多机结构，以实现数据冗余、高可用、数据备份和多地域读取等；<br>如MySQL/MongoDB/Redis, 所以复制中断异常的Troubleshtooing和预案都是DBA们常常聊话题。<br>本文主要写Redis较常见的两种复制中断，以及导致反复无限次同步。</p>
 <hr>
@@ -466,7 +466,7 @@
 </ul>
 <h2 id="Redis复制中断场景"><a href="#Redis复制中断场景" class="headerlink" title="Redis复制中断场景"></a>Redis复制中断场景</h2><p>导致Redis复制中断场景，常见以下两种情况(注:不包含网络等外部环境)</p>
 <ul>
-<li>Master端的Slave客户端输出缓冲，达到限制大小，被客户端强制Kill，导致复制中断</li>
+<li>Master端的Slave客户端输出缓冲，达到限制大小，被Redis Server强制Kill，导致复制中断</li>
 <li>Master和Slave之间复制超时repl-timeout断开，导致复制中断</li>
 </ul>
 <h3 id="Slave客户端的Client-output-buffer达到大小限制被Master强制Kill"><a href="#Slave客户端的Client-output-buffer达到大小限制被Master强制Kill" class="headerlink" title="Slave客户端的Client output buffer达到大小限制被Master强制Kill"></a>Slave客户端的Client output buffer达到大小限制被Master强制Kill</h3><p>为实时同步Master写入数据，Slave产生一个长连接到Master；当这个长连接被断开后，复制被中断。2.1小节深入讨论因输出缓冲区达到大小限制，复制连接被Master强行断开的理论分析、故障现象和规避措施.</p>
