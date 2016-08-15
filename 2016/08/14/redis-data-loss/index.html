@@ -92,7 +92,7 @@
 <meta property="og:url" content="http://yoursite.com/2016/08/14/redis-data-loss/index.html">
 <meta property="og:site_name" content="今天">
 <meta property="og:description" content="Redis大部分场景当作纯缓存使用，请求后端有Primary Storage的组件,如MySQL,HBase;请求Redis的键未命中，会从primary Storage中获取数据返回，同时更新Redis缓存。如果少量数据丢失，相当于请求”缓冲未命中“； 一般对业务的影响是无感知的。但现在Redis用作存储的业务场景变多，数据丢失对业务是致命的影响。本文简单讨论Redis常见数据”丢失“现象，以及">
-<meta property="og:updated_time" content="2016-08-15T10:36:21.000Z">
+<meta property="og:updated_time" content="2016-08-15T10:54:55.000Z">
 <meta name="twitter:card" content="summary">
 <meta name="twitter:title" content="Redis数据“丢失”情节版-草稿">
 <meta name="twitter:description" content="Redis大部分场景当作纯缓存使用，请求后端有Primary Storage的组件,如MySQL,HBase;请求Redis的键未命中，会从primary Storage中获取数据返回，同时更新Redis缓存。如果少量数据丢失，相当于请求”缓冲未命中“； 一般对业务的影响是无感知的。但现在Redis用作存储的业务场景变多，数据丢失对业务是致命的影响。本文简单讨论Redis常见数据”丢失“现象，以及">
@@ -332,7 +332,7 @@
 <li>主库故障后自动重启，可能导致数据丢失</li>
 <li>网络分区的问题，导致短时间的写入数据丢失（详细讨论，参考哨兵的数据丢失问题讨论）</li>
 <li>主从复制数据不一致，发生故障切换后，出现数据丢失</li>
-<li>大量键过期，触发主动清理</li>
+<li>大量过期键，同时被淘汰清理</li>
 </ul>
 <h3 id="程序bug或人为误操作"><a href="#程序bug或人为误操作" class="headerlink" title="程序bug或人为误操作"></a>程序bug或人为误操作</h3><p>如前文情节1，程序bug误删除数据； DBA/RD误操作执行flushall/flushdb这类命令。</p>
 <p>这类问题的预防和监控<br>1 重命令危险命令：keys(程度大批量误删除，很多通过keys获取键后再删除)，flushall，flushdb<br>2 细化几个重要的监控项：</p>
@@ -361,7 +361,12 @@
 </blockquote>
 <h3 id="网络分区的问题，导致短时间的写入数据丢失"><a href="#网络分区的问题，导致短时间的写入数据丢失" class="headerlink" title="网络分区的问题，导致短时间的写入数据丢失"></a>网络分区的问题，导致短时间的写入数据丢失</h3><p>这种问题出现丢失数据都很少，网络分区问题期间，Redis集群或哨兵在判断故障切换时，这段时间写入到原主库的数据，10来秒的写入量。这个场景的分析会复杂，<br>详细见Redis哨兵分析</p>
 <h3 id="主从复制数据不一致，发生故障切换后，出现数据丢失"><a href="#主从复制数据不一致，发生故障切换后，出现数据丢失" class="headerlink" title="主从复制数据不一致，发生故障切换后，出现数据丢失"></a>主从复制数据不一致，发生故障切换后，出现数据丢失</h3><p>主从数据出现不一致，发生故障切换，从库提升为主后，导致数据丢失的情况。<br>针对</p>
-<h2 id="数据“丢失”问题排查"><a href="#数据“丢失”问题排查" class="headerlink" title="数据“丢失”问题排查"></a>数据“丢失”问题排查</h2>
+<h3 id="大量过期键，同时被淘汰清理"><a href="#大量过期键，同时被淘汰清理" class="headerlink" title="大量过期键，同时被淘汰清理"></a>大量过期键，同时被淘汰清理</h3><p>这类情况不是“数据丢失”，只是定期主动清理Redis堆积的过期键，会导致Redis的键个数(dbsize)出现陡降(高大能达20%）; 业务方常误以为</p>
+<blockquote>
+<p>说明：关于过期键，大量堆积成为“死键”问题，详细分析参考<a href="/2016/08/05/redis-useless-keys/" title="Redis的“死键”问题">Redis的“死键”问题</a></p>
+</blockquote>
+<p>参考：</p>
+
       
     </div>
 
@@ -580,7 +585,7 @@
               
             
             
-              <div class="post-toc-content"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#记几次Redis”数据丢失“的故障排查"><span class="nav-number">1.</span> <span class="nav-text">记几次Redis”数据丢失“的故障排查</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#情节1："><span class="nav-number">1.1.</span> <span class="nav-text">情节1：</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#情节2"><span class="nav-number">1.2.</span> <span class="nav-text">情节2:</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#情节3："><span class="nav-number">1.3.</span> <span class="nav-text">情节3：</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#数据丢失的影响"><span class="nav-number">2.</span> <span class="nav-text">数据丢失的影响</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#常见Redis数据丢失的情况"><span class="nav-number">3.</span> <span class="nav-text">常见Redis数据丢失的情况</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#程序bug或人为误操作"><span class="nav-number">3.1.</span> <span class="nav-text">程序bug或人为误操作</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#因客户端缓冲区内存使用过大，导致大量键被LRU淘汰"><span class="nav-number">3.2.</span> <span class="nav-text">因客户端缓冲区内存使用过大，导致大量键被LRU淘汰</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#主库故障后自动重启，可能导致数据全部丢失"><span class="nav-number">3.3.</span> <span class="nav-text">主库故障后自动重启，可能导致数据全部丢失</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#网络分区的问题，导致短时间的写入数据丢失"><span class="nav-number">3.4.</span> <span class="nav-text">网络分区的问题，导致短时间的写入数据丢失</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#主从复制数据不一致，发生故障切换后，出现数据丢失"><span class="nav-number">3.5.</span> <span class="nav-text">主从复制数据不一致，发生故障切换后，出现数据丢失</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#数据“丢失”问题排查"><span class="nav-number">4.</span> <span class="nav-text">数据“丢失”问题排查</span></a></li></ol></div>
+              <div class="post-toc-content"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#记几次Redis”数据丢失“的故障排查"><span class="nav-number">1.</span> <span class="nav-text">记几次Redis”数据丢失“的故障排查</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#情节1："><span class="nav-number">1.1.</span> <span class="nav-text">情节1：</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#情节2"><span class="nav-number">1.2.</span> <span class="nav-text">情节2:</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#情节3："><span class="nav-number">1.3.</span> <span class="nav-text">情节3：</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#数据丢失的影响"><span class="nav-number">2.</span> <span class="nav-text">数据丢失的影响</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#常见Redis数据丢失的情况"><span class="nav-number">3.</span> <span class="nav-text">常见Redis数据丢失的情况</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#程序bug或人为误操作"><span class="nav-number">3.1.</span> <span class="nav-text">程序bug或人为误操作</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#因客户端缓冲区内存使用过大，导致大量键被LRU淘汰"><span class="nav-number">3.2.</span> <span class="nav-text">因客户端缓冲区内存使用过大，导致大量键被LRU淘汰</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#主库故障后自动重启，可能导致数据全部丢失"><span class="nav-number">3.3.</span> <span class="nav-text">主库故障后自动重启，可能导致数据全部丢失</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#网络分区的问题，导致短时间的写入数据丢失"><span class="nav-number">3.4.</span> <span class="nav-text">网络分区的问题，导致短时间的写入数据丢失</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#主从复制数据不一致，发生故障切换后，出现数据丢失"><span class="nav-number">3.5.</span> <span class="nav-text">主从复制数据不一致，发生故障切换后，出现数据丢失</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#大量过期键，同时被淘汰清理"><span class="nav-number">3.6.</span> <span class="nav-text">大量过期键，同时被淘汰清理</span></a></li></ol></li></ol></div>
             
           </div>
         </section>
