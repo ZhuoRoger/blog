@@ -388,11 +388,11 @@
   </entry>
   
   <entry>
-    <title>Redis Cluster Imbalance</title>
+    <title>Redis集群“倾斜”问题</title>
     <link href="http://yoursite.com/2016/08/03/redis-cluster-imbalance/"/>
     <id>http://yoursite.com/2016/08/03/redis-cluster-imbalance/</id>
     <published>2016-08-03T15:50:00.000Z</published>
-    <updated>2016-08-11T12:13:25.000Z</updated>
+    <updated>2016-08-15T13:04:21.000Z</updated>
     
     <content type="html"><![CDATA[<p>对分布式存储系统的架构和运维管理，如何保证每个Node的数据存储容量和请求量尽量均衡，是非常重要的。<br>本文介绍Redis大集群运维过程中，常见导致数据和请求量“倾斜”的场景，及规避措施。</p>
 <hr>
@@ -584,11 +584,11 @@
   </entry>
   
   <entry>
-    <title>Redis Client query buffer and output buffer</title>
+    <title>Redis客户端查询缓冲区和输出缓冲区</title>
     <link href="http://yoursite.com/2016/07/30/redis-client-two-buffers/"/>
     <id>http://yoursite.com/2016/07/30/redis-client-two-buffers/</id>
     <published>2016-07-30T08:29:33.000Z</published>
-    <updated>2016-08-11T12:15:34.000Z</updated>
+    <updated>2016-08-15T13:01:18.000Z</updated>
     
     <content type="html"><![CDATA[<p>每个Redis客户端（以下简称”Client”)都有多个状态属性，而理解和分析这些属性，对于我们设计Redis键空间和运营管理都有帮助。<br>本文将详细分析Client的两个重要属性：Query buffer（输入缓冲区）、Output buffers（输出缓冲区）</p>
 <hr>
