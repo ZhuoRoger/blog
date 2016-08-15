@@ -251,7 +251,7 @@
               
                 
                 <a class="post-title-link" href="/2016/08/14/redis-data-loss/" itemprop="url">
-                  Redis数据“丢失”情节版-草稿
+                  Redis数据“丢失”问题
                 </a>
               
             
@@ -319,7 +319,7 @@
 
       
         
-          <p>Redis大部分场景当作纯缓存使用，请求后端有Primary Storage的组件,如MySQL,HBase;请求Redis的键未命中，会从primary Storage中获取数据返回，同时更新Redis缓存。<br>如果少量数据丢失，相当于请求”缓冲未命中“； 一般对业务的影响是无感知的。<br>但现在Redis用作存储的业务场景变多，数据丢失对业务是致命的影响。<br>本文简单讨论Redis常见数据”丢失“现象，以及怎么规避；会列举几个生产中有意思的情节。</p>
+          <p>Redis大部分应用场景是纯缓存服务，请求后端有Primary Storage的组件,如MySQL,HBase;请求Redis的键未命中，会从primary Storage中获取数据返回，同时更新Redis缓存。<br>如果少量数据丢失，相当于请求”缓冲未命中“； 一般对业务的影响是无感知的。<br>但现在Redis用作存储的业务场景变多，数据丢失对业务是致命的影响。<br>本文简单讨论Redis常见数据”丢失“现象，以及怎么规避；会列举几个生产中有意思的情节。</p>
 <hr>
           <div class="post-more-link text-center">
             <a class="btn" href="/2016/08/14/redis-data-loss/#more" rel="contents">
