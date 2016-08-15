@@ -5,7 +5,7 @@
   <link href="/atom.xml" rel="self"/>
   
   <link href="http://yoursite.com/"/>
-  <updated>2016-08-15T12:46:35.000Z</updated>
+  <updated>2016-08-15T12:48:29.000Z</updated>
   <id>http://yoursite.com/</id>
   
   <author>
@@ -20,7 +20,7 @@
     <link href="http://yoursite.com/2016/08/14/redis-data-loss/"/>
     <id>http://yoursite.com/2016/08/14/redis-data-loss/</id>
     <published>2016-08-14T06:42:07.000Z</published>
-    <updated>2016-08-15T12:46:35.000Z</updated>
+    <updated>2016-08-15T12:48:29.000Z</updated>
     
     <content type="html"><![CDATA[<p>Redis大部分应用场景是纯缓存服务，请求后端有Primary Storage的组件,如MySQL,HBase;请求Redis的键未命中，会从primary Storage中获取数据返回，同时更新Redis缓存。<br>如果少量数据丢失，相当于请求”缓冲未命中“； 一般对业务的影响是无感知的。<br>但现在Redis用作存储的业务场景变多，数据丢失对业务是致命的影响。<br>本文简单讨论Redis常见数据”丢失“现象，以及怎么规避；会列举几个生产中有意思的情节。</p>
 <hr>
@@ -40,7 +40,7 @@
 <li>程序bug或人为误操作</li>
 <li>因客户端缓冲区内存使用过大，导致大量键被LRU淘汰</li>
 <li>主库故障后自动重启，可能导致数据丢失</li>
-<li>网络分区的问题，导致短时间的写入数据丢失</li>
+<li>网络分区的问题，可能导致短时间的写入数据丢失</li>
 <li>主从复制数据不一致，发生故障切换后，出现数据丢失</li>
 <li>大量过期键，同时被淘汰清理</li>
 </ul>
@@ -68,7 +68,7 @@
 <blockquote>
 <p>建议：数据库这类重“状态性”服务，不建议程序暴力自动重启</p>
 </blockquote>
-<h3 id="网络分区的问题，导致短时间的写入数据丢失"><a href="#网络分区的问题，导致短时间的写入数据丢失" class="headerlink" title="网络分区的问题，导致短时间的写入数据丢失"></a><a href="https://en.wikipedia.org/wiki/Network_partition" target="_blank" rel="external">网络分区</a>的问题，导致短时间的写入数据丢失</h3><p>这种问题出现丢失数据都很少，网络分区时，Redis集群或哨兵在判断故障切换的时间窗口，这段时间写入到原主库的数据，5秒~15秒的写入量。<br>详细分析参考：<br><a href="http://antirez.com/news/55" target="_blank" rel="external">Reply to Aphyr attack to Sentinel</a><br><a href="http://code.flickr.net/2014/07/31/redis-sentinel-at-flickr/" target="_blank" rel="external">redis-sentinel-at-flickr</a></p>
+<h3 id="网络分区的问题，可能导致短时间的写入数据丢失"><a href="#网络分区的问题，可能导致短时间的写入数据丢失" class="headerlink" title="网络分区的问题，可能导致短时间的写入数据丢失"></a><a href="https://en.wikipedia.org/wiki/Network_partition" target="_blank" rel="external">网络分区</a>的问题，可能导致短时间的写入数据丢失</h3><p>这种问题出现丢失数据都很少，网络分区时，Redis集群或哨兵在判断故障切换的时间窗口，这段时间写入到原主库的数据，5秒~15秒的写入量。<br>详细分析参考：<br><a href="http://antirez.com/news/55" target="_blank" rel="external">Reply to Aphyr attack to Sentinel</a><br><a href="http://code.flickr.net/2014/07/31/redis-sentinel-at-flickr/" target="_blank" rel="external">redis-sentinel-at-flickr</a></p>
 <p>图片(引至参考2): Redis哨兵结构的网络分区导致的“split-brain”场景<br><img src="/images/redis-data-loss/redis-sentineal.png" alt="redis_keys"></p>
 <h3 id="主从复制数据不一致，发生故障切换后，出现数据丢失"><a href="#主从复制数据不一致，发生故障切换后，出现数据丢失" class="headerlink" title="主从复制数据不一致，发生故障切换后，出现数据丢失"></a>主从复制数据不一致，发生故障切换后，出现数据丢失</h3><p>主从数据出现不一致，发生故障切换，从库提升为主后，导致数据丢失的情况。<br>关于Redis复制数据不一致，请参考<a href="/2016/08/13/redis-replication-inconsistence/" title="Redis复制主从数据不-致">Redis复制主从数据不-致</a></p>
 <h3 id="大量过期键，同时被淘汰清理"><a href="#大量过期键，同时被淘汰清理" class="headerlink" title="大量过期键，同时被淘汰清理"></a>大量过期键，同时被淘汰清理</h3><p>这类情况不是真正的“数据丢失”，只是定期主动清理Redis堆积的过期键，会导致Redis的键个数(dbsize)出现陡降(最大能达20%）。业务方常误以为有数据丢失。</p>
