@@ -98,12 +98,12 @@
     <link href="http://yoursite.com/2016/08/13/redis-replication-inconsistence/"/>
     <id>http://yoursite.com/2016/08/13/redis-replication-inconsistence/</id>
     <published>2016-08-13T07:49:38.000Z</published>
-    <updated>2016-08-15T10:37:37.000Z</updated>
+    <updated>2016-08-15T12:54:06.000Z</updated>
     
-    <content type="html"><![CDATA[<p>很多常见的数据库，都采用逻辑异步(半同步)的方式复制，数据是最终一致性的；这就可能导致复制主从的数据不一致。而对MySQL这种关系数据库，如果复制数据出现不一致，这种故障对业务而言，往往是影响极大的。<br>Redis的缓存场景来说，主从数据不一致或丢失，其对业务影响都很小，一般不被大家所重视。<br>随着Redis用于存储场景越来越多，数据量也越大；这就使保证Redis复制数据一致会比较重要。<br>本文简单讨论Redis复制数据不一致性的影响、常见故障场景和如何避免等</p>
+    <content type="html"><![CDATA[<p>很多常见的数据库，都采用逻辑异步(或半同步)的方式复制，数据是最终一致性的；<br>这就可能导致复制主从的数据不一致。<br>对MySQL这种关系数据库，如果复制数据出现不一致，这种故障对业务而言，往往是影响极大的。<br>但Redis的缓存场景来说，主从数据不一致或丢失，其对业务影响都很小，一般不被大家所重视。<br>随着Redis用于存储场景越来越多，数据量也越大；这就使保证Redis复制数据一致会比较重要。<br>本文简单讨论Redis复制数据不一致性的影响、常见故障场景和如何避免等</p>
 <hr>
 <a id="more"></a>
-<h2 id="Redis复制数据不一致的影响"><a href="#Redis复制数据不一致的影响" class="headerlink" title="Redis复制数据不一致的影响"></a>Redis复制数据不一致的影响</h2><p>复制主从数据不一致，对业务都会造成一定有影响：</p>
+<h2 id="Redis复制主从数据不一致的影响"><a href="#Redis复制主从数据不一致的影响" class="headerlink" title="Redis复制主从数据不一致的影响"></a>Redis复制主从数据不一致的影响</h2><p>复制主从数据不一致，对业务都会造成一定有影响：</p>
 <ul>
 <li>从库只读业务受影响；<br>当Redis从库对业务提供只读服务，主从数据不一致；从库会读到“脏数据”。</li>
 <li>可能导致数据丢失；<br>复制主从数据不一致，当从库重新同步时，会导致从库“误“写入的数据丢失，以主库数据为准；当主从发生故障切换后，旧主库的数据会被旧从库数据完全覆盖，引起数据丢失。</li>
@@ -123,13 +123,13 @@
 <p>说明：Redis持续复制延时的机率很小，因为有明显延时，Slave线程的客户端输出缓冲区易达到限制，导致复制中断。关于客户端输出缓冲区，可参考<a href="/2016/07/30/redis-client-two-buffers/" title="Redis Clients Two Buffers">Redis Clients Two Buffers</a></p>
 </blockquote>
 <p>Redis复制延时监控方法<br>1 offset延时大小：Master端info Replication返回的 master_repl_offset-每个从库的offset<br>2 Slave上报的lag间隔，默认1秒上报一次<br>3 Master ping或发送数据到从库的时间间隔,master_last_io_seconds_ago</p>
-<h3 id="Redis从库写入数据"><a href="#Redis从库写入数据" class="headerlink" title="Redis从库写入数据"></a>Redis从库写入数据</h3><p>从库被程序写入数据，尤其有读写分离的场景； 建议Slave设置只读slave-read-only为YES(默认值）。<br>设置从库只读的Slave,尝试写入数据时出错<br><figure class="highlight plain"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div></pre></td><td class="code"><pre><div class="line">127.0.0.1:6379&gt;  set mykey myvalue</div><div class="line">(error) READONLY You can&apos;t write against a read only slave.</div></pre></td></tr></table></figure></p>
+<h3 id="Redis从库写入数据"><a href="#Redis从库写入数据" class="headerlink" title="Redis从库写入数据"></a>Redis从库写入数据</h3><p>从库被程序写入数据，尤其有读写分离的场景，程序配置错误写入从库；<br>从Redis2.6版本开始，从库支持设置为只读slave-read-only为YES(默认值）<br>设置从库只读的Slave,尝试写入数据时出错<br><figure class="highlight plain"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div></pre></td><td class="code"><pre><div class="line">127.0.0.1:6379&gt;  set mykey myvalue</div><div class="line">(error) READONLY You can&apos;t write against a read only slave.</div></pre></td></tr></table></figure></p>
 <h3 id="Redis从库内存使用达到maxmemory限制"><a href="#Redis从库内存使用达到maxmemory限制" class="headerlink" title="Redis从库内存使用达到maxmemory限制"></a>Redis从库内存使用达到maxmemory限制</h3><p>Redis从库内存使用达到maxmemory限制，可能导致主库写入命令，复制到从库时被丢弃；这样导致从库写入丢失，造成主从数据不一致。<br>生产环境中，主从Redis的maxmemory设置都相同的； 如果从库内存使用，比主库提前达到maxmemory限制，这样从库会放弃内存变大的写入操作，直到内存量减少到maxmemory.<br>Redis是否设置有”内存淘汰策略“也一样</p>
 <ul>
 <li>设置有内存淘汰</li>
 <li>未设置LRU淘汰</li>
 </ul>
-<p>这类问题很难直接杜绝，因为Redis缓存应用场景，内存使用都是达到maxmemory限制的；<br>只能尽量避免从库”非数据存储内存消耗“，注意内存客户端连接，输入和输出缓冲区的消耗。<br>存储应用场景的：<br>1.内存使用率监控，used_memory/maxmemory<br>2.监控客户端输入和输出缓冲区内存的使用量</p>
+<p>这类问题很难直接杜绝，因为Redis缓存应用场景，内存使用都是达到maxmemory限制的；<br>只能尽量避免从库”非数据存储内存消耗“，注意内存客户端连接，输入和输出缓冲区的消耗。<br>1.内存使用率监控，used_memory/maxmemory<br>2.监控客户端输入和输出缓冲区内存的使用量</p>
 <h3 id="Redis主库过期键清理过慢"><a href="#Redis主库过期键清理过慢" class="headerlink" title="Redis主库过期键清理过慢"></a>Redis主库过期键清理过慢</h3><p>Redis默认每秒只能清理数十个过期键（生存时间为0的键）。之前文章<a href="/2016/08/05/redis-useless-keys/" title="Redis的死键问题">Redis的死键问题</a>已详细分析这个现象。<br>如果主库存在大量的过期键(理论最坏能达25%),基后从库重新全量同步过(rdb),这时主库bgsave产生的rdb文件不包含已过期的键，从库load这rdb文件后，也就不包含主库实例中未清理的过期键。<br>这样从库dbsize看到的key就会比主库少(理论能相关25%）。</p>
 <blockquote>
 <p>说明：这类数据不一致，主库数据多，对业务是不影响的</p>
@@ -141,7 +141,7 @@
     
     <summary type="html">
     
-      &lt;p&gt;很多常见的数据库，都采用逻辑异步(半同步)的方式复制，数据是最终一致性的；这就可能导致复制主从的数据不一致。而对MySQL这种关系数据库，如果复制数据出现不一致，这种故障对业务而言，往往是影响极大的。&lt;br&gt;Redis的缓存场景来说，主从数据不一致或丢失，其对业务影响都很小，一般不被大家所重视。&lt;br&gt;随着Redis用于存储场景越来越多，数据量也越大；这就使保证Redis复制数据一致会比较重要。&lt;br&gt;本文简单讨论Redis复制数据不一致性的影响、常见故障场景和如何避免等&lt;/p&gt;
+      &lt;p&gt;很多常见的数据库，都采用逻辑异步(或半同步)的方式复制，数据是最终一致性的；&lt;br&gt;这就可能导致复制主从的数据不一致。&lt;br&gt;对MySQL这种关系数据库，如果复制数据出现不一致，这种故障对业务而言，往往是影响极大的。&lt;br&gt;但Redis的缓存场景来说，主从数据不一致或丢失，其对业务影响都很小，一般不被大家所重视。&lt;br&gt;随着Redis用于存储场景越来越多，数据量也越大；这就使保证Redis复制数据一致会比较重要。&lt;br&gt;本文简单讨论Redis复制数据不一致性的影响、常见故障场景和如何避免等&lt;/p&gt;
 &lt;hr&gt;
     
     </summary>
