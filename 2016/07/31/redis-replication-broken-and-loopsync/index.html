@@ -92,7 +92,7 @@
 <meta property="og:url" content="http://yoursite.com/2016/07/31/redis-replication-broken-and-loopsync/index.html">
 <meta property="og:site_name" content="今天">
 <meta property="og:description" content="很多常见数据库(含NoSQL)都用复制技术的多机结构，以实现数据冗余、高可用、数据备份和多地域读取等；如MySQL/MongoDB/Redis, 所以复制中断异常的Troubleshtooing和预案都是DBA们常常聊话题。本文主要写Redis较常见的两种复制中断，以及导致反复无限次同步。">
-<meta property="og:updated_time" content="2016-08-15T13:15:05.000Z">
+<meta property="og:updated_time" content="2016-08-22T12:37:24.000Z">
 <meta name="twitter:card" content="summary">
 <meta name="twitter:title" content="Redis复制中断和无限同步问题">
 <meta name="twitter:description" content="很多常见数据库(含NoSQL)都用复制技术的多机结构，以实现数据冗余、高可用、数据备份和多地域读取等；如MySQL/MongoDB/Redis, 所以复制中断异常的Troubleshtooing和预案都是DBA们常常聊话题。本文主要写Redis较常见的两种复制中断，以及导致反复无限次同步。">
@@ -382,7 +382,7 @@
 <h4 id="Master与Slave间的心跳检测"><a href="#Master与Slave间的心跳检测" class="headerlink" title="Master与Slave间的心跳检测"></a>Master与Slave间的心跳检测</h4><p>那么Redis Master和slave是怎么做心跳检查的</p>
 <ul>
 <li>Master每隔10秒(repl-ping-slave-period参数配置)向Slave发送PING命令</li>
-<li>Slave每隔1秒向Master发送”REPLCONF” “ACK” “数字(slave_repl_offset)”</li>
+<li>Slave每隔1秒向Master发送”Redis复制中断和无限同步问题” “ACK” “数字(slave_repl_offset)”</li>
 </ul>
 <p>Master发送给Slave的PING命令，在Slave端使用Monitor命令查看如下：<br><figure class="highlight plain"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div></pre></td><td class="code"><pre><div class="line">1470062065.418475 [0 127.0.0.1:7000] &quot;PING&quot;</div><div class="line">1470062075.431501 [0 127.0.0.1:7000] &quot;PING&quot;</div></pre></td></tr></table></figure></p>
 <p>Slave发送Master的REPLCONF命令,在Master端使用Monitor命令查看<br><figure class="highlight plain"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div></pre></td><td class="code"><pre><div class="line">1470062074.229797 [0 127.0.0.1:44105] &quot;REPLCONF&quot; &quot;ACK&quot; &quot;137158669602&quot;</div><div class="line">1470062075.231199 [0 127.0.0.1:44105] &quot;REPLCONF&quot; &quot;ACK&quot; &quot;137158669602&quot;</div><div class="line">1470062076.232647 [0 127.0.0.1:44105] &quot;REPLCONF&quot; &quot;ACK&quot; &quot;137158669616&quot;</div></pre></td></tr></table></figure></p>
@@ -570,7 +570,7 @@
         <nav class="site-state motion-element">
           <div class="site-state-item site-state-posts">
             <a href="/archives">
-              <span class="site-state-item-count">9</span>
+              <span class="site-state-item-count">10</span>
               <span class="site-state-item-name">日志</span>
             </a>
           </div>
