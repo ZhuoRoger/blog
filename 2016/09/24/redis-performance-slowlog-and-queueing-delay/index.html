@@ -86,16 +86,19 @@
 
 
 
-<meta name="description" content="很多常见的数据库，都采用逻辑异步(或半同步)的方式复制，数据是最终一致性的；这就可能导致复制主从的数据不一致。对MySQL这种关系数据库，如果复制数据出现不一致，这种故障对业务而言，往往是影响极大的。但Redis的缓存场景来说，主从数据不一致或丢失，其对业务影响都很小，一般不被大家所重视。随着Redis用于存储场景越来越多，数据量也越大；这就使保证Redis复制数据一致会比较重要。本文简单讨论Re">
+<meta name="description" content="本文介绍以下几点: 1 Redis slowlog不完全可靠 2 请求的排队延迟 3 Redis Single-threads希望对大家排查Redis性能问题时有所帮助。">
 <meta property="og:type" content="article">
-<meta property="og:title" content="Redis复制主从数据不-致">
-<meta property="og:url" content="http://yoursite.com/2016/08/13/redis-replication-inconsistence/index.html">
+<meta property="og:title" content="Redis性能问题排查-slowlog和排队延时">
+<meta property="og:url" content="http://yoursite.com/2016/09/24/redis-performance-slowlog-and-queueing-delay/index.html">
 <meta property="og:site_name" content="今天">
-<meta property="og:description" content="很多常见的数据库，都采用逻辑异步(或半同步)的方式复制，数据是最终一致性的；这就可能导致复制主从的数据不一致。对MySQL这种关系数据库，如果复制数据出现不一致，这种故障对业务而言，往往是影响极大的。但Redis的缓存场景来说，主从数据不一致或丢失，其对业务影响都很小，一般不被大家所重视。随着Redis用于存储场景越来越多，数据量也越大；这就使保证Redis复制数据一致会比较重要。本文简单讨论Re">
-<meta property="og:updated_time" content="2016-08-23T00:32:56.000Z">
+<meta property="og:description" content="本文介绍以下几点: 1 Redis slowlog不完全可靠 2 请求的排队延迟 3 Redis Single-threads希望对大家排查Redis性能问题时有所帮助。">
+<meta property="og:image" content="http://yoursite.com/images/redis-slowlog-delay/redis-slowlog-queue-delay.png">
+<meta property="og:image" content="http://yoursite.com/images/redis-slowlog-delay/redis-slowlog-tcprstat.png">
+<meta property="og:updated_time" content="2016-09-24T03:11:03.000Z">
 <meta name="twitter:card" content="summary">
-<meta name="twitter:title" content="Redis复制主从数据不-致">
-<meta name="twitter:description" content="很多常见的数据库，都采用逻辑异步(或半同步)的方式复制，数据是最终一致性的；这就可能导致复制主从的数据不一致。对MySQL这种关系数据库，如果复制数据出现不一致，这种故障对业务而言，往往是影响极大的。但Redis的缓存场景来说，主从数据不一致或丢失，其对业务影响都很小，一般不被大家所重视。随着Redis用于存储场景越来越多，数据量也越大；这就使保证Redis复制数据一致会比较重要。本文简单讨论Re">
+<meta name="twitter:title" content="Redis性能问题排查-slowlog和排队延时">
+<meta name="twitter:description" content="本文介绍以下几点: 1 Redis slowlog不完全可靠 2 请求的排队延迟 3 Redis Single-threads希望对大家排查Redis性能问题时有所帮助。">
+<meta name="twitter:image" content="http://yoursite.com/images/redis-slowlog-delay/redis-slowlog-queue-delay.png">
 
 
 
@@ -116,9 +119,9 @@
 
 
 
-  <link rel="canonical" href="http://yoursite.com/2016/08/13/redis-replication-inconsistence/"/>
+  <link rel="canonical" href="http://yoursite.com/2016/09/24/redis-performance-slowlog-and-queueing-delay/"/>
 
-  <title> Redis复制主从数据不-致 | 今天 </title>
+  <title> Redis性能问题排查-slowlog和排队延时 | 今天 </title>
 </head>
 
 <body itemscope itemtype="http://schema.org/WebPage" lang="zh-Hans">
@@ -248,7 +251,7 @@
             
             
               
-                Redis复制主从数据不-致
+                Redis性能问题排查-slowlog和排队延时
               
             
           </h1>
@@ -260,38 +263,19 @@
               <i class="fa fa-calendar-o"></i>
             </span>
             <span class="post-meta-item-text">发表于</span>
-            <time itemprop="dateCreated" datetime="2016-08-13T15:49:38+08:00" content="2016-08-13">
-              2016-08-13
+            <time itemprop="dateCreated" datetime="2016-09-24T10:50:50+08:00" content="2016-09-24">
+              2016-09-24
             </time>
           </span>
 
-          
-            <span class="post-category" >
-              &nbsp; | &nbsp;
-              <span class="post-meta-item-icon">
-                <i class="fa fa-folder-o"></i>
-              </span>
-              <span class="post-meta-item-text">分类于</span>
-              
-                <span itemprop="about" itemscope itemtype="https://schema.org/Thing">
-                  <a href="/categories/Redis/" itemprop="url" rel="index">
-                    <span itemprop="name">Redis</span>
-                  </a>
-                </span>
-
-                
-                
-
-              
-            </span>
           
 
           
             
               <span class="post-comments-count">
                 &nbsp; | &nbsp;
-                <a href="/2016/08/13/redis-replication-inconsistence/#comments" itemprop="discussionUrl">
-                  <span class="post-comments-count ds-thread-count" data-thread-key="2016/08/13/redis-replication-inconsistence/" itemprop="commentsCount"></span>
+                <a href="/2016/09/24/redis-performance-slowlog-and-queueing-delay/#comments" itemprop="discussionUrl">
+                  <span class="post-comments-count ds-thread-count" data-thread-key="2016/09/24/redis-performance-slowlog-and-queueing-delay/" itemprop="commentsCount"></span>
                 </a>
               </span>
             
@@ -319,43 +303,22 @@
       
 
       
-        <p>很多常见的数据库，都采用逻辑异步(或半同步)的方式复制，数据是最终一致性的；<br>这就可能导致复制主从的数据不一致。<br>对MySQL这种关系数据库，如果复制数据出现不一致，这种故障对业务而言，往往是影响极大的。<br>但Redis的缓存场景来说，主从数据不一致或丢失，其对业务影响都很小，一般不被大家所重视。<br>随着Redis用于存储场景越来越多，数据量也越大；这就使保证Redis复制数据一致会比较重要。<br>本文简单讨论Redis复制数据不一致性的影响、常见故障场景和如何避免等</p>
+        <p>本文介绍以下几点:<br> 1 Redis slowlog不完全可靠<br> 2 请求的排队延迟<br> 3 Redis Single-threads<br>希望对大家排查Redis性能问题时有所帮助。</p>
 <hr>
 <a id="more"></a>
-<h2 id="Redis复制主从数据不一致的影响"><a href="#Redis复制主从数据不一致的影响" class="headerlink" title="Redis复制主从数据不一致的影响"></a>Redis复制主从数据不一致的影响</h2><p>复制主从数据不一致，对业务都会造成一定有影响：</p>
-<ul>
-<li>从库只读业务受影响；<br>当Redis从库对业务提供只读服务，主从数据不一致；从库会读到“脏数据”。</li>
-<li>可能导致数据丢失；<br>复制主从数据不一致，当从库重新同步时，会导致从库“误“写入的数据丢失，以主库数据为准；当主从发生故障切换后，旧主库的数据会被旧从库数据完全覆盖，引起数据丢失。</li>
-<li>数据备份是不可靠的；<br>对于存储场景的Redis, RDB/AOF形式的数据备份都在从库完成的；如果主从数据不一致，这样备份的数据是不完整的。</li>
-</ul>
-<p>其实Redis复制数据不一致，对于纯缓存的场景影响很小；一般对存储场景或读写分离的场景有一定影响。</p>
-<h2 id="导致Redis复制数据不一致的常见情况"><a href="#导致Redis复制数据不一致的常见情况" class="headerlink" title="导致Redis复制数据不一致的常见情况"></a>导致Redis复制数据不一致的常见情况</h2><ul>
-<li>Redis复制延时</li>
-<li>Redis从库写入数据</li>
-<li>Redis从库内存使用达到maxmemory限制</li>
-<li>Redis主库过期键清理过慢</li>
-<li>Redis从库读取到已过期的”死键“</li>
-<li>Redis主从Rename规则不一样，导致命令丢失</li>
-</ul>
-<h3 id="Redis复制延时"><a href="#Redis复制延时" class="headerlink" title="Redis复制延时"></a>Redis复制延时</h3><p>在写入量过大或执行耗时长的命令，Redis从库会复制延时抖动；抖动这段时间，从库的数据是落后于主库的，即”不一致的“。</p>
-<blockquote>
-<p>说明：Redis持续复制延时的机率很小，因为有明显延时，Slave线程的客户端输出缓冲区易达到限制，导致复制中断。关于客户端输出缓冲区，可参考<a href="/2016/07/30/redis-client-two-buffers/" title="Redis Clients Two Buffers">Redis Clients Two Buffers</a></p>
-</blockquote>
-<p>Redis复制延时监控方法<br>1 offset延时大小：Master端info Replication返回的 master_repl_offset-每个从库的offset<br>2 Slave上报的lag间隔，默认1秒上报一次<br>3 Master ping或发送数据到从库的时间间隔,master_last_io_seconds_ago</p>
-<h3 id="Redis从库写入数据"><a href="#Redis从库写入数据" class="headerlink" title="Redis从库写入数据"></a>Redis从库写入数据</h3><p>从库被程序写入数据，尤其有读写分离的场景，程序配置错误写入从库；<br>从Redis2.6版本开始，从库支持设置为只读slave-read-only为YES(默认值）<br>设置从库只读的Slave,尝试写入数据时出错<br><figure class="highlight plain"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div></pre></td><td class="code"><pre><div class="line">127.0.0.1:6379&gt;  set mykey myvalue</div><div class="line">(error) READONLY You can&apos;t write against a read only slave.</div></pre></td></tr></table></figure></p>
-<h3 id="Redis从库内存使用达到maxmemory限制"><a href="#Redis从库内存使用达到maxmemory限制" class="headerlink" title="Redis从库内存使用达到maxmemory限制"></a>Redis从库内存使用达到maxmemory限制</h3><p>Redis从库内存使用达到maxmemory限制，可能导致主库写入命令，复制到从库时被丢弃；这样导致从库写入丢失，造成主从数据不一致。<br>生产环境中，主从Redis的maxmemory设置都相同的； 如果从库内存使用，比主库提前达到maxmemory限制，这样从库会放弃内存变大的写入操作，直到内存量减少到maxmemory.<br>Redis是否设置有”内存淘汰策略“也一样</p>
-<ul>
-<li>设置有内存淘汰</li>
-<li>未设置LRU淘汰</li>
-</ul>
-<p>这类问题很难直接杜绝，因为Redis缓存应用场景，内存使用都是达到maxmemory限制的；<br>只能尽量避免从库”非数据存储内存消耗“，注意内存客户端连接，输入和输出缓冲区的消耗。<br>1.内存使用率监控，used_memory/maxmemory<br>2.监控客户端输入和输出缓冲区内存的使用量</p>
-<h3 id="Redis主库过期键清理过慢"><a href="#Redis主库过期键清理过慢" class="headerlink" title="Redis主库过期键清理过慢"></a>Redis主库过期键清理过慢</h3><p>Redis默认每秒只能清理数十个过期键（生存时间为0的键）。之前文章<a href="/2016/08/05/redis-useless-keys/" title="Redis的死键问题">Redis的死键问题</a>已详细分析这个现象。<br>如果主库存在大量的过期键(理论最坏能达25%),基后从库重新全量同步过(rdb),这时主库bgsave产生的rdb文件不包含已过期的键，从库load这rdb文件后，也就不包含主库实例中未清理的过期键。<br>这样从库dbsize看到的key就会比主库少(理论能相关25%）。</p>
-<blockquote>
-<p>说明：这类数据不一致，主库数据多，对业务是不影响的</p>
-</blockquote>
-<p>关于如何减少Redis过期“死键”的堆积，请参考前面提到的文章。</p>
-<h3 id="Redis从库读取到已过期的”死键“"><a href="#Redis从库读取到已过期的”死键“" class="headerlink" title="Redis从库读取到已过期的”死键“"></a>Redis从库读取到已过期的”死键“</h3><p>如上节提到过期键清理不及时问题；如果业务对从库有只读操作，读取到过期键时，会返回给客户端；<br>而不是像主库一样，直接删除过期键，客户端返回空。<br>这算是Redis的BUG——-确认bug号</p>
-<h3 id="Redis主从Rename规则不一样，导致命令丢失"><a href="#Redis主从Rename规则不一样，导致命令丢失" class="headerlink" title="Redis主从Rename规则不一样，导致命令丢失"></a>Redis主从Rename规则不一样，导致命令丢失</h3><p>Redis为提高安全性，提供rename命令机制，把一些危险命令给重命名，或者直接禁掉。<br>但如果主从库的对同一个命令,rename后不一样，会导致这个命令复制时，被从库丢弃。<br>比如有些场景，把flushall/flushdb这类命令，rename为一个随机字符串；我们在主库执行这个随机字符串flush主库数据时，从库会丢失这个命令，这样导致从库数据未被flush, 出现复制数据不一致现象。<br>建议rename的机制尽量保持一致性，控制好redis配置文件权限，避免rename规则外泄就好。</p>
+<h2 id="Redis-Slowlog"><a href="#Redis-Slowlog" class="headerlink" title="Redis Slowlog"></a>Redis Slowlog</h2><p><a href="http://redis.io/commands/slowlog" target="_blank" rel="external"><strong>[Redis Slowlog]</strong></a>是排查性能问题关键监控指标。它是记录Redis queries运行时间超时特定阀值的系统。<br>这类慢查询命令被保存到Redis服务器的一个定长队列，最多保存slowlog-max-len(默认128）个慢查询命令。<br>当慢查询命令达到128个时，新产生的慢查询被加入前，会从队列中删除最旧的慢查询命令。</p>
+<h3 id="Redis-Slowlog的配置"><a href="#Redis-Slowlog的配置" class="headerlink" title="Redis Slowlog的配置"></a>Redis Slowlog的配置</h3><p>redis slowlog通过2个参数配置管理，默认命令耗时超过10毫秒，就会被记录到慢查询日志队列中；队列默认保存最近产生的128个慢查询命令。<br><strong>slowlog-log-slower-than:</strong> 慢查询阀值,单位微秒. 默认100000(10毫秒);<br>   生产环境设置1ms,因为Redis是single thread,如果命令都是1ms以上,则实例的吞吐量只有1000QPS.<br><strong>slowlog-max-len:</strong> 慢查询存储的最大个数,默认128;<br>生产设置设置大于1024,因为slowlog会省略过多的参数，慢查询不会占用过多的内存；<br>慢查询队列满后,淘汰最老的慢查询实体。</p>
+<h3 id="Redis-Slowlog读取"><a href="#Redis-Slowlog读取" class="headerlink" title="Redis Slowlog读取"></a>Redis Slowlog读取</h3><p>redis-cli客户端通过slowlog get指令获取最新10条慢查询命令。<br>当然各语言的client也实现对应的接口。<br><figure class="highlight plain"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div></pre></td><td class="code"><pre><div class="line">示例：获取最近2个慢查询命令 </div><div class="line">127.0.0.1:6381&gt; SLOWLOG get 2</div><div class="line">1) 1) (integer) 6</div><div class="line">   2) (integer) 1458734263</div><div class="line">   3) (integer) 74372</div><div class="line">   4) 1) &quot;hgetall&quot;</div><div class="line">      2) &quot;max.dsp.blacklist&quot;</div><div class="line">2) 1) (integer) 5</div><div class="line">   2) (integer) 1458734258</div><div class="line">   3) (integer) 5411075</div><div class="line">   4) 1) &quot;keys&quot;</div><div class="line">      2) &quot;max.dsp.blacklist&quot;</div><div class="line">分析slowlog query：</div><div class="line">  以第一个HGET命令为例分析，每个slowlog实体共4个字段：</div><div class="line">  * 字段1：1个整数,表示这个slowlog出现的序号,server启动后递增, 当前为6.</div><div class="line">  * 字段2：表示查询执行时的Unix时间戳.</div><div class="line">  * 字段3：表示查询执行微妙数,当前是74372微妙,约74ms.</div><div class="line">  * 字段4: 表示查询的命令和参数,如果参数很多或很大,只会显示部分并给数参数个数;</div><div class="line">  当前命令是&quot;hgetall&quot;   &quot;max.dsp.blacklist&quot;</div></pre></td></tr></table></figure></p>
+<h3 id="Redis-Slowlog只计算命令的执行时间"><a href="#Redis-Slowlog只计算命令的执行时间" class="headerlink" title="Redis Slowlog只计算命令的执行时间"></a>Redis Slowlog只计算命令的执行时间</h3><p>如MySQL/MongoDB等常见数据库，慢查询的query_time都会包含命令所有耗时，包含锁等待这类时间； 而Redis的慢查询query_time只记录自己“被cpu服务的时间”，不包含排队等待、IO等待（如AOF SYNC）这类时间。<br><strong>理解这点非常重要</strong><br><figure class="highlight plain"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div></pre></td><td class="code"><pre><div class="line">参考：</div><div class="line">    The Redis Slow Log is a system to log queries that exceeded a </div><div class="line">specified execution time. The execution time does not include I/O </div><div class="line">operations like talking with the client, sending the reply and so forth,</div><div class="line">but just the time needed to actually execute the command (this is the only</div><div class="line">stage of command execution where the thread is blocked and can not serve</div><div class="line">other requests in the meantime).</div></pre></td></tr></table></figure></p>
+<h2 id="Queueing-Delay"><a href="#Queueing-Delay" class="headerlink" title="Queueing Delay"></a>Queueing Delay</h2><p>Queueing Delay(后文称排队延迟）是在<a href="http://method-r.com/papers/file/44-thinking-clearly-about-performance" target="_blank" rel="external">Thinking Clearly About Performance<br>Paper</a>和《Systems Performance:Enterprise and the Cloud》书中有提出；<br>在并发系统中，工作量对某类资源请求超过其所能处理的程度(即饱和度）,请求就会出现排队等待，请求等待被服务的时间(Q)就叫排队延迟。<br><figure class="highlight plain"><table><tr><td class="gutter"><pre><div class="line">1</div></pre></td><td class="code"><pre><div class="line">queueing delay: time spent waiting in a queue for access to a shared resource.</div></pre></td></tr></table></figure></p>
+<p><img src="/images/redis-slowlog-delay/redis-slowlog-queue-delay.png" alt="Queueing Delay"><br>            [<strong>图1：Response time with queueing delay</strong>]<br>图片引用于[<strong>Thinking Clearly About Performance</strong>], 在图中「M/M/8」排列模型中，当资源使用率达到饱和度，请求开始出现排队等待。<br>设定请求的响应时间(R),服务时间(S), 排队延时（Q).<br><strong>R = S + Q</strong></p>
+<p>我们回到Redis的Slowlog问题上，上节已说slowlog只计算Redis命令被服务的时间，并不包含命令的排队延迟时间。<br><strong>现在做个测试：</strong><br>1 redis实例port=6386,分别打开两个session.  session-1模拟一个执行耗时6秒的大命令debug sleep 6；隔几秒后session-2执行一个简单的set a b的命令。<br>2 使用<a href="https://www.percona.com/docs/wiki/tcprstat_start.html" target="_blank" rel="external"><em><strong>Percona tcprstat</strong></em></a>监控redis的<strong>响应时间</strong><br>3 2个sessions的命令执行完成后，查看redis slowlog记录的命令耗时（slowlog-log-slower-than设置0）</p>
+<p><strong>测试结论</strong><br>1 从redis响应时间监控(min列），可见set a b命令耗时1530357微秒(约1.53秒）；<br>但从redis slowlog中查看set a b命令耗时为8微秒，可见slowlog没有记录set命令排队延迟等待的时间。<br>2 因Redis是单线程模型，debug sleep阻塞了set命令，set命令的整体<strong>响应时间(R)</strong>是1530357微秒，而其<strong>服务时间(S)</strong>为8微秒，<strong>排队延迟(Q)</strong>为1530349微秒。</p>
+<p><strong>Session-1:</strong><br>xxxx:6386&gt; debug sleep  6<br>OK<br>(6.00s)</p>
+<p><strong>Session-2:</strong><br>xxxxx:6386&gt; set a b<br>OK<br>(1.53s)</p>
+<p><strong>Redis Slowlog:</strong><br>xxxx:6386&gt; SLOWLOG get<br>1) 1) (integer) 10<br>   2) (integer) 1474684074<br>   3) (integer) 8<br>   4) 1) “set”<br>      2) “a”<br>      3) “b”<br>2) 1) (integer) 9<br>   2) (integer) 1474684074<br>   3) (integer) 6000116<br>   4) 1) “debug”<br>      2) “sleep”<br>      3) “6”</p>
+<p><strong>Redis的响应时间监控：</strong><br> <img src="/images/redis-slowlog-delay/redis-slowlog-tcprstat.png" alt="Redis tcprstat"></p>
+<h2 id="Redis-Single-threads"><a href="#Redis-Single-threads" class="headerlink" title="Redis Single-threads"></a>Redis Single-threads</h2><p>Redis Server是单线程的处理(bgsave或aof重写时会Fork子进程处理），同一时间只能处理一个命令，并且是同步完成的。<br>从上节的测试中可见，set命令服务时间只有8微秒，但被debug sleep 6命令阻塞后，响应时间变成1.53秒。<br>所以RD和DBA在设计keyspace和访问模式时，应尽量避免使用<strong>耗时较大的命令</strong>。<br>在理想状态下，Redis单实例能处理8~10w的QPS, 如果大量的redis命令大量耗时大于1ms, 其实QPS只能达到1000基于几百。<br>Redis出现耗时大的命令，导致其他所有请求被阻塞等待，redis处理能力急剧退化，易导致整个服务链雪崩。</p>
 
       
     </div>
@@ -387,17 +350,13 @@
         <div class="post-nav">
           <div class="post-nav-next post-nav-item">
             
-              <a href="/2016/08/13/redis-delete-large-keys/" rel="next" title="如何优雅地删除Redis大键">
-                <i class="fa fa-chevron-left"></i> 如何优雅地删除Redis大键
+              <a href="/2016/08/20/redis-monitor-and-alarm/" rel="next" title="细说Redis监控和告警">
+                <i class="fa fa-chevron-left"></i> 细说Redis监控和告警
               </a>
             
           </div>
 
           <div class="post-nav-prev post-nav-item">
-            
-              <a href="/2016/08/14/redis-data-loss/" rel="prev" title="Redis数据“丢失”问题">
-                Redis数据“丢失”问题 <i class="fa fa-chevron-right"></i>
-              </a>
             
           </div>
         </div>
@@ -446,8 +405,8 @@
           
   <div class="comments" id="comments">
     
-      <div class="ds-thread" data-thread-key="2016/08/13/redis-replication-inconsistence/"
-           data-title="Redis复制主从数据不-致" data-url="http://yoursite.com/2016/08/13/redis-replication-inconsistence/">
+      <div class="ds-thread" data-thread-key="2016/09/24/redis-performance-slowlog-and-queueing-delay/"
+           data-title="Redis性能问题排查-slowlog和排队延时" data-url="http://yoursite.com/2016/09/24/redis-performance-slowlog-and-queueing-delay/">
       </div>
     
   </div>
@@ -579,7 +538,7 @@
               
             
             
-              <div class="post-toc-content"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#Redis复制主从数据不一致的影响"><span class="nav-number">1.</span> <span class="nav-text">Redis复制主从数据不一致的影响</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#导致Redis复制数据不一致的常见情况"><span class="nav-number">2.</span> <span class="nav-text">导致Redis复制数据不一致的常见情况</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#Redis复制延时"><span class="nav-number">2.1.</span> <span class="nav-text">Redis复制延时</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Redis从库写入数据"><span class="nav-number">2.2.</span> <span class="nav-text">Redis从库写入数据</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Redis从库内存使用达到maxmemory限制"><span class="nav-number">2.3.</span> <span class="nav-text">Redis从库内存使用达到maxmemory限制</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Redis主库过期键清理过慢"><span class="nav-number">2.4.</span> <span class="nav-text">Redis主库过期键清理过慢</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Redis从库读取到已过期的”死键“"><span class="nav-number">2.5.</span> <span class="nav-text">Redis从库读取到已过期的”死键“</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Redis主从Rename规则不一样，导致命令丢失"><span class="nav-number">2.6.</span> <span class="nav-text">Redis主从Rename规则不一样，导致命令丢失</span></a></li></ol></li></ol></div>
+              <div class="post-toc-content"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#Redis-Slowlog"><span class="nav-number">1.</span> <span class="nav-text">Redis Slowlog</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#Redis-Slowlog的配置"><span class="nav-number">1.1.</span> <span class="nav-text">Redis Slowlog的配置</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Redis-Slowlog读取"><span class="nav-number">1.2.</span> <span class="nav-text">Redis Slowlog读取</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Redis-Slowlog只计算命令的执行时间"><span class="nav-number">1.3.</span> <span class="nav-text">Redis Slowlog只计算命令的执行时间</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Queueing-Delay"><span class="nav-number">2.</span> <span class="nav-text">Queueing Delay</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#Redis-Single-threads"><span class="nav-number">3.</span> <span class="nav-text">Redis Single-threads</span></a></li></ol></div>
             
           </div>
         </section>
